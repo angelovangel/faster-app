@@ -14,7 +14,7 @@ out_dir = "docs"
 asset_dir = "assets"
 
 [web.app]
-base_path = "faster-app"
+#base_path = "faster-app"
 
 # HTML title tag content
 title = "faster-app"
