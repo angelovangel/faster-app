@@ -1,9 +1,4 @@
-//! This example shows how to use the `file` methods on FormEvent and DragEvent to handle file uploads and drops.
-//!
-//! Dioxus intercepts these events and provides a Rusty interface to the file data. Since we want this interface to
-//! be crossplatform,
-//! 
-//use std::fs::read_to_string;
+
 use std::sync::Arc;
 use std::io;
 use std::io::prelude::*;
@@ -28,11 +23,16 @@ struct UploadedFile {
     bases: u64,
 }
 
- fn decode_reader(bytes: Vec<u8>) -> io::Result<String> {
-    let mut gz = MultiGzDecoder::new(&bytes[..]);
-    let mut s = String::new();
-    gz.read_to_string(&mut s)?;
-    Ok(s)
+ fn decode_reader(bytes: Vec<u8>, filename: &String) -> io::Result<String> {
+    if filename.ends_with(".gz") {
+        let mut gz = MultiGzDecoder::new(&bytes[..]);
+        let mut s = String::new();
+        gz.read_to_string(&mut s)?;
+        Ok(s)   
+    } else {
+        let s = String::from_utf8(bytes).unwrap();
+        Ok(s)
+    }
  }
 
 fn app() -> Element {
@@ -50,36 +50,20 @@ fn app() -> Element {
             // decide which reader to use based on extension
 
             if let Some(bytes) = file_engine.read_file(&file_name).await {
-                if file_name.ends_with(".gz") {
-                    let recs2 = decode_reader(bytes).unwrap();
+                let recs2 = decode_reader(bytes, file_name).unwrap();
+                let mut recs = fastq::Reader::new(recs2.as_bytes()).records();
                     
-                    let mut recs = fastq::Reader::new(recs2.as_bytes()).records();
-                    
-                    while let Some(Ok(rec)) = recs.next() {
-                        nreads += 1;
-                        nbases += rec.seq().len() as u64;
-                    }
-                    //chrs += contents.chars().count() as u64;
-                    files_uploaded.write().push(UploadedFile {
-                        name: file_name.clone(),
-                        //contents,
-                        reads: nreads,
-                        bases: nbases
-                    });
-                } else {
-                    let mut recs = fastq::Reader::new(bytes.as_slice()).records();
-                    while let Some(Ok(rec)) = recs.next() {
-                        nreads += 1;
-                        nbases += rec.seq().len() as u64;
-                    }
-                    //chrs += contents.chars().count() as u64;
-                    files_uploaded.write().push(UploadedFile {
-                        name: file_name.clone(),
-                        //contents,
-                        reads: nreads,
-                        bases: nbases
-                    });
+                while let Some(Ok(rec)) = recs.next() {
+                    nreads += 1;
+                    nbases += rec.seq().len() as u64;
                 }
+
+                files_uploaded.write().push(UploadedFile {
+                    name: file_name.clone(),
+                    //contents,
+                    reads: nreads,
+                    bases: nbases
+                });
             } 
         }
     };
@@ -153,7 +137,7 @@ fn app() -> Element {
                 }
             }
             tbody {
-                for file in files_uploaded.read().iter() {
+                for file in files_uploaded.read().iter().rev() {
                     tr {
                         td {"{file.name}"}
                         td {"{HumanCount(file.reads)}"}
