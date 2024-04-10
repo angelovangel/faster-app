@@ -11,6 +11,7 @@ use dioxus::{html::HasFileData, prelude::dioxus_elements::FileEngine};
 
 use indicatif::HumanCount;
 
+mod modules;
 
 
 fn main() {
@@ -21,6 +22,9 @@ struct UploadedFile {
     name: String,
     reads: u64,
     bases: u64,
+    nx: u64,
+    q20: String,
+    q30: String
 }
 
  fn decode_reader(bytes: Vec<u8>, filename: &String) -> io::Result<String> {
@@ -47,6 +51,9 @@ fn app() -> Element {
         for file_name in &files {
             let mut nreads: u64 = 0;
             let mut nbases: u64 = 0;
+            let mut qual20: i64 = 0;
+            let mut qual30: i64 = 0;
+            let mut len_vector: Vec<i64> = Vec::new();
             // decide which reader to use based on extension
 
             if let Some(bytes) = file_engine.read_file(&file_name).await {
@@ -56,13 +63,20 @@ fn app() -> Element {
                 while let Some(Ok(rec)) = recs.next() {
                     nreads += 1;
                     nbases += rec.seq().len() as u64;
+                    qual20 += modules::get_qual_bases(rec.qual(), 53); // 33 offset
+                    qual30 += modules::get_qual_bases(rec.qual(), 63); // 33 offset
+                    len_vector.push(rec.seq().len() as i64)
                 }
+                let n50 = modules::get_nx(&mut len_vector, 0.5);
 
                 files_uploaded.write().push(UploadedFile {
                     name: file_name.clone(),
                     //contents,
                     reads: nreads,
-                    bases: nbases
+                    bases: nbases,
+                    q20: format!("{:.2}", qual20 as f64 / nbases as f64 * 100.0),
+                    q30: format!("{:.2}", qual30 as f64 / nbases as f64 * 100.0),
+                    nx: n50 as u64
                 });
             } 
         }
@@ -86,8 +100,10 @@ fn app() -> Element {
         }
 
         div {
+            
             label { r#for: "directory-upload", "Enable directory upload" }
             input {
+                class: "usercontrols",
                 r#type: "checkbox",
                 id: "directory-upload",
                 checked: enable_directory_upload,
@@ -98,8 +114,9 @@ fn app() -> Element {
         div {
             label { r#for: "textreader", "Upload fastx files" }
             input {
+                class: "usercontrols",
                 r#type: "file",
-                accept: ".txt,.fastq,.gz",
+                accept: ".fastq,.gz",
                 multiple: true,
                 name: "textreader",
                 directory: enable_directory_upload,
@@ -108,7 +125,10 @@ fn app() -> Element {
         }
         div {
             label {"Clear files"}
-            button { onclick: move |_| files_uploaded.write().clear(), "Clear" }
+            button {
+                class: "usercontrols",
+                onclick: move |_| files_uploaded.write().clear(), "Clear" 
+            }
         }
         
         div {
@@ -134,6 +154,9 @@ fn app() -> Element {
                     th {"File"}
                     th {"Reads"}
                     th {"Bases"}
+                    th {"N50"}
+                    th {"Q20%"}
+                    th {"Q30%"}
                 }
             }
             tbody {
@@ -142,6 +165,9 @@ fn app() -> Element {
                         td {"{file.name}"}
                         td {"{HumanCount(file.reads)}"}
                         td {"{HumanCount(file.bases)}"}
+                        td {"{HumanCount(file.nx)}"}
+                        td {"{file.q20}"}
+                        td {"{file.q30}"}
                     }
                 }
             }

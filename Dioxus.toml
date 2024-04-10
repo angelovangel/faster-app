@@ -14,7 +14,7 @@ out_dir = "docs"
 asset_dir = "assets"
 
 [web.app]
-#base_path = "faster-app"
+base_path = "faster-app"
 
 # HTML title tag content
 title = "faster-app"
@@ -29,10 +29,14 @@ watch_path = ["src", "assets"]
 
 # include `assets` in web platform
 [web.resource]
-
+style = [
+    "https://fonts.googleapis.com/css?family=Roboto:300,400,500",
+    "https://fonts.googleapis.com/css?family=Material+Icons&display=block",
+    # ...
+]
 # CSS style file
 
-style = []
+#style = []
 
 # Javascript code file
 script = []
