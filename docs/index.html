@@ -12,8 +12,8 @@
 <body>
   <div id="main"></div>
   <script type="module">
-    import init from "/./assets/dioxus/faster-app.js";
-    init("/./assets/dioxus/faster-app_bg.wasm").then(wasm => {
+    import init from "/faster-app/assets/dioxus/faster-app.js";
+    init("/faster-app/assets/dioxus/faster-app_bg.wasm").then(wasm => {
       if (wasm.__wbindgen_start == undefined) {
         wasm.main();
       }
