@@ -39,17 +39,13 @@ struct UploadedFile {
     }
  }
 
-fn table() -> Element {
-    rsx! {
-        
-    }
-}
 
 fn app() -> Element {
     //let mut enable_directory_upload = use_signal(|| false);
     //let mut pretty_numbers = use_signal(|| true);
     let mut files_uploaded = use_signal(|| Vec::new() as Vec<UploadedFile>);
     let mut hovered = use_signal(|| false);
+    let mut busy = use_signal(|| false);
 
 
     let read_files = move |file_engine: Arc<dyn FileEngine>| async move {
@@ -90,7 +86,9 @@ fn app() -> Element {
 
     let upload_files = move |evt: FormEvent| async move {
         if let Some(file_engine) = evt.files() {
+            busy.set(true);
             read_files(file_engine).await;
+            busy.set(false);
         }
     };
 
@@ -154,7 +152,14 @@ fn app() -> Element {
             },
             "Drop files here"
         }
-        
+        if busy() {
+            div {
+                span {
+                    class: "loader",
+                }
+                p {"Please wait ..."}
+            }
+        }
         if files_uploaded.len() > 0 {
         table {
             id: "resultstable",
