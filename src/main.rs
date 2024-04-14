@@ -27,25 +27,28 @@ struct UploadedFile {
     q30: String
 }
 
- fn decode_reader(bytes: Vec<u8>, filename: &String) -> io::Result<String> {
-    if filename.ends_with(".gz") {
-        let mut gz = MultiGzDecoder::new(&bytes[..]);
-        let mut s = String::new();
-        gz.read_to_string(&mut s)?;
-        Ok(s)   
-    } else {
-        let s = String::from_utf8(bytes).unwrap();
-        Ok(s)
-    }
- }
+fn decode_reader(bytes: Vec<u8>, filename: &String) -> io::Result<String> {
+   if filename.ends_with(".gz") {
+       let mut gz = MultiGzDecoder::new(&bytes[..]);
+       let mut s = String::new();
+       gz.read_to_string(&mut s)?;
+       Ok(s)   
+   } else {
+       let s = String::from_utf8(bytes).unwrap();
+       Ok(s)
+   }
+}
 
 
 fn app() -> Element {
     //let mut enable_directory_upload = use_signal(|| false);
-    //let mut pretty_numbers = use_signal(|| true);
+    let mut pretty_numbers = use_signal(|| true);
     let mut files_uploaded = use_signal(|| Vec::new() as Vec<UploadedFile>);
+    //let mut processed_reads = use_signal(|| 0);
     let mut hovered = use_signal(|| false);
     let mut busy = use_signal(|| false);
+
+
 
 
     let read_files = move |file_engine: Arc<dyn FileEngine>| async move {
@@ -63,6 +66,7 @@ fn app() -> Element {
                 let mut recs = fastq::Reader::new(recs2.as_bytes()).records();
                     
                 while let Some(Ok(rec)) = recs.next() {
+                    //processed_reads += 1;
                     nreads += 1;
                     nbases += rec.seq().len() as u64;
                     qual20 += modules::get_qual_bases(rec.qual(), 53); // 33 offset
@@ -91,10 +95,14 @@ fn app() -> Element {
             busy.set(false);
         }
     };
+    
+
+    let downloadtable = "<a> Download table </a>";
 
     rsx! {
-        style { {include_str!("../assets/file_upload.css")} }
-        
+        style { 
+            {include_str!("../assets/file_upload.css")} 
+        }
         div {
             id: "title",
             h2 { "Fastq file analysis app in web assembly" }
@@ -141,13 +149,15 @@ fn app() -> Element {
         div {
             id: "drop-zone",
             prevent_default: "ondragover ondrop",
-            background_color: if hovered() { "lightblue" } else { "lightgray" },
+            background_color: if hovered() { "#3498DB" } else { "#D6EAF8" },
             ondragover: move |_| hovered.set(true),
             ondragleave: move |_| hovered.set(false),
             ondrop: move |evt| async move {
                 hovered.set(false);
                 if let Some(file_engine) = evt.files() {
+                    busy.set(true);
                     read_files(file_engine).await;
+                    busy.set(false);
                 }
             },
             "Drop files here"
@@ -157,10 +167,26 @@ fn app() -> Element {
                 span {
                     class: "loader",
                 }
-                p {"Please wait ..."}
+                p {"Processed {files_uploaded.len()} files. Please wait ..."}
             }
         }
         if files_uploaded.len() > 0 {
+        div {
+            label { r#for: "pretty-numbers", "Use thousands separator" }
+            input {
+                class: "usercontrols",
+                r#type: "checkbox",
+                checked: pretty_numbers,
+                oninput: move |evt| pretty_numbers.set(evt.checked()),
+            }
+            label {""}
+            button {
+                class: "usercontrols",
+                dangerous_inner_html: "{downloadtable}",
+                //onclick: move |_| ,
+                
+            }
+        }
         table {
             id: "resultstable",
             thead {
@@ -175,6 +201,7 @@ fn app() -> Element {
             }
             tbody {
                 for file in files_uploaded.read().iter() {
+                    if pretty_numbers() {
                     tr {
                         td {"{file.name}"}
                         td {"{HumanCount(file.reads)}"}
@@ -182,6 +209,16 @@ fn app() -> Element {
                         td {"{HumanCount(file.nx)}"}
                         td {"{file.q20}"}
                         td {"{file.q30}"}
+                    }
+                    } else {
+                        tr {
+                            td {"{file.name}"}
+                            td {"{file.reads}"}
+                            td {"{file.bases}"}
+                            td {"{file.nx}"}
+                            td {"{file.q20}"}
+                            td {"{file.q30}"}
+                        }
                     }
                 }
             }
