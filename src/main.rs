@@ -164,7 +164,7 @@ fn app() -> Element {
         }
         if busy() {
             div {
-                span {
+                div {
                     class: "loader",
                 }
                 p {"Processed {files_uploaded.len()} files. Please wait ..."}
