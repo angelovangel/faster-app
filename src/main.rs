@@ -17,7 +17,6 @@ mod modules;
 fn main() {
     launch(app);
 }
-
 struct UploadedFile {
     name: String,
     reads: u64,
@@ -39,12 +38,12 @@ fn decode_reader(bytes: Vec<u8>, filename: &String) -> io::Result<String> {
    }
 }
 
-
 fn app() -> Element {
     //let mut enable_directory_upload = use_signal(|| false);
     let mut pretty_numbers = use_signal(|| true);
     let mut files_uploaded = use_signal(|| Vec::new() as Vec<UploadedFile>);
-    //let mut processed_reads = use_signal(|| 0);
+    let mut total_reads = use_signal(|| 0);
+    let mut total_bases = use_signal(|| 0);
     let mut hovered = use_signal(|| false);
     let mut busy = use_signal(|| false);
 
@@ -84,6 +83,8 @@ fn app() -> Element {
                     q30: format!("{:.2}", qual30 as f64 / nbases as f64 * 100.0),
                     nx: n50 as u64
                 });
+                total_bases += nbases;
+                total_reads += nreads;
             } 
         }
     };
@@ -96,12 +97,10 @@ fn app() -> Element {
         }
     };
     
-
     let downloadtable = "<a> Download table </a>";
-
     rsx! {
         style { 
-            {include_str!("../assets/file_upload.css")} 
+            {include_str!("../assets/custom.css")} 
         }
         div {
             id: "title",
@@ -113,18 +112,6 @@ fn app() -> Element {
             Select or drop .fastq or .fastq.gz files to analyse. All is done in the browser, no data is sent out." 
             }
         }
-        
-        // div {
-        //     label { r#for: "directory-upload", "Enable directory upload" }
-        //     input {
-        //         class: "usercontrols",
-        //         r#type: "checkbox",
-        //         id: "directory-upload",
-        //         checked: enable_directory_upload,
-        //         oninput: move |evt| enable_directory_upload.set(evt.checked()),
-        //     }
-        // }
-
         div {
             label { r#for: "textreader", "" }
             input {
@@ -137,15 +124,36 @@ fn app() -> Element {
                 directory: false,
                 onchange: upload_files,
             }
-        //}
-        //div {
+
             label {""}
             button {
                 class: "usercontrols",
-                onclick: move |_| files_uploaded.write().clear(), "Clear" 
+                onclick: move |_| {
+                    files_uploaded.write().clear(); 
+                    total_bases.set(0); 
+                    total_reads.set(0)
+                },
+                "Clear" 
+            }
+        //}
+        //div {
+            if files_uploaded.len() > 0{
+            label { r#for: "pretty-numbers", "Use thousands separator" }
+            input {
+                class: "usercontrols",
+                r#type: "checkbox",
+                checked: pretty_numbers,
+                oninput: move |evt| pretty_numbers.set(evt.checked()),
+            }
+            label {""}
+            button {
+                class: "usercontrols",
+                dangerous_inner_html: "{downloadtable}",
+                //onclick: move |_| ,
+            
+            }
             }
         }
-        
         div {
             id: "drop-zone",
             prevent_default: "ondragover ondrop",
@@ -164,6 +172,7 @@ fn app() -> Element {
         }
         if busy() {
             div {
+                // this loader should run on separate thread
                 div {
                     class: "loader",
                 }
@@ -171,25 +180,9 @@ fn app() -> Element {
             }
         }
         if files_uploaded.len() > 0 {
-        div {
-            label { r#for: "pretty-numbers", "Use thousands separator" }
-            input {
-                class: "usercontrols",
-                r#type: "checkbox",
-                checked: pretty_numbers,
-                oninput: move |evt| pretty_numbers.set(evt.checked()),
-            }
-            label {""}
-            button {
-                class: "usercontrols",
-                dangerous_inner_html: "{downloadtable}",
-                //onclick: move |_| ,
-                
-            }
-        }
-        table {
-            id: "resultstable",
-            thead {
+            table {
+                id: "resultstable",
+                thead {
                 tr {
                     th {"File"}
                     th {"Reads"}
@@ -198,30 +191,42 @@ fn app() -> Element {
                     th {"Q20%"}
                     th {"Q30%"}
                 }
-            }
-            tbody {
-                for file in files_uploaded.read().iter() {
+                }
+                tbody {
                     if pretty_numbers() {
-                    tr {
-                        td {"{file.name}"}
-                        td {"{HumanCount(file.reads)}"}
-                        td {"{HumanCount(file.bases)}"}
-                        td {"{HumanCount(file.nx)}"}
-                        td {"{file.q20}"}
-                        td {"{file.q30}"}
-                    }
-                    } else {
+                        for file in files_uploaded.read().iter() {
+                            tr {
+                            td {"{file.name}"}
+                            td {"{HumanCount(file.reads)}"}
+                            td {"{HumanCount(file.bases)}"}
+                            td {"{HumanCount(file.nx)}"}
+                            td {"{file.q20}"}
+                            td {"{file.q30}"}
+                            }
+                        }
                         tr {
+                        td {"Total"}
+                        td {"{HumanCount(total_reads())}"}
+                        td {"{HumanCount(total_bases())}"}
+                        }
+                    } else {
+                        for file in files_uploaded.read().iter() {
+                            tr {
                             td {"{file.name}"}
                             td {"{file.reads}"}
                             td {"{file.bases}"}
                             td {"{file.nx}"}
                             td {"{file.q20}"}
                             td {"{file.q30}"}
+                            }
+                        }
+                        tr {
+                        td {"Total"}
+                        td {"{total_reads}"}
+                        td {"{total_bases}"}
                         }
                     }
                 }
-            }
         }
         }
     }

@@ -14,6 +14,10 @@ p {
   margin: 0.5em;
 }
 
+.vertLine {
+  border-right:1px #ff0000;    /* line 1 pixel width, length of "Some content" */
+}
+
 .right {
   margin: 1em;
   float: right;
