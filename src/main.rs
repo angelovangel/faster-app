@@ -47,9 +47,6 @@ fn app() -> Element {
     let mut hovered = use_signal(|| false);
     let mut busy = use_signal(|| false);
 
-
-
-
     let read_files = move |file_engine: Arc<dyn FileEngine>| async move {
         let files = file_engine.files();
         for file_name in &files {
@@ -65,7 +62,6 @@ fn app() -> Element {
                 let mut recs = fastq::Reader::new(recs2.as_bytes()).records();
                     
                 while let Some(Ok(rec)) = recs.next() {
-                    //processed_reads += 1;
                     nreads += 1;
                     nbases += rec.seq().len() as u64;
                     qual20 += modules::get_qual_bases(rec.qual(), 53); // 33 offset

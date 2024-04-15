@@ -20,3 +20,12 @@ rayon = "1.5"
 log = "0.4.19"
 dioxus-logger = "0.4.1"
 console_error_panic_hook = "0.1.7"
+
+[release]
+opt-level = "z"
+debug = false
+lto = true
+codegen-units = 1
+panic = "abort"
+strip = true
+incremental = false
