@@ -26,7 +26,7 @@ struct UploadedFile {
     q30: String
 }
 
-fn decode_reader(bytes: Vec<u8>, filename: &String) -> io::Result<String> {
+async fn decode_reader(bytes: Vec<u8>, filename: &String) -> io::Result<String> {
    if filename.ends_with(".gz") {
        let mut gz = MultiGzDecoder::new(&bytes[..]);
        let mut s = String::new();
@@ -58,7 +58,7 @@ fn app() -> Element {
             // decide which reader to use based on extension
 
             if let Some(bytes) = file_engine.read_file(&file_name).await {
-                let recs2 = decode_reader(bytes, file_name).unwrap();
+                let recs2 = decode_reader(bytes, file_name).await.unwrap();
                 let mut recs = fastq::Reader::new(recs2.as_bytes()).records();
                     
                 while let Some(Ok(rec)) = recs.next() {
@@ -66,7 +66,7 @@ fn app() -> Element {
                     nbases += rec.seq().len() as u64;
                     qual20 += modules::get_qual_bases(rec.qual(), 53); // 33 offset
                     qual30 += modules::get_qual_bases(rec.qual(), 63); // 33 offset
-                    len_vector.push(rec.seq().len() as i64)
+                    len_vector.push(rec.seq().len() as i64);
                 }
                 let n50 = modules::get_nx(&mut len_vector, 0.5);
 
@@ -103,9 +103,9 @@ fn app() -> Element {
             h2 { "Fastq file analysis app in web assembly" }
         }
         div {
-            p{ 
+            p{
             "This is a Wasm application that runs basic analysis on sequencing files in fastq format. 
-            Select or drop .fastq or .fastq.gz files to analyse. All is done in the browser, no data is sent out." 
+            Select or drop .fastq or .fastq.gz files to analyse. All is done in the browser, no data is sent out" 
             }
         }
         div {
@@ -168,11 +168,14 @@ fn app() -> Element {
         }
         if busy() {
             div {
+                dialog {"test"}
                 // this loader should run on separate thread
                 div {
                     class: "loader",
                 }
-                p {"Processed {files_uploaded.len()} files. Please wait ..."}
+                p {
+                    "Please wait ..."
+                }
             }
         }
         if files_uploaded.len() > 0 {
