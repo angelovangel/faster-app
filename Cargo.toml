@@ -9,7 +9,6 @@ edition = "2021"
 [dependencies]
 
 dioxus = { version = "0.5", features = ["web", "router"] }
-# material-dioxus = {version = "0.0.3-dev", features = ["full"]}
 bio = "1.6.0"
 getrandom = { version = "0.2", features = ["js"] }
 indicatif = "0.17.8"
