@@ -2,7 +2,6 @@
 use std::sync::Arc;
 use std::io;
 use std::io::prelude::*;
-use rfd::FileDialog;
 
 use bio::io::fastq;
 use flate2::read::MultiGzDecoder;
@@ -20,7 +19,7 @@ fn main() {
     LaunchBuilder::desktop()
         .with_cfg(
         Config::new()
-                    .with_window(WindowBuilder::new().with_focused(true)
+                    .with_window(WindowBuilder::new().with_focused(true).with_title("faster-app")
                 )
         )
         .launch(app)
@@ -109,7 +108,7 @@ fn app() -> Element {
         }
         div {
             id: "title",
-            h2 { "Fastq file analysis app in web assembly" }
+            h2 { "Simple fastx file analysis" }
         }
         div {
             p{
