@@ -2,12 +2,14 @@
 use std::sync::Arc;
 use std::io;
 use std::io::prelude::*;
+use rfd::FileDialog;
 
 use bio::io::fastq;
 use flate2::read::MultiGzDecoder;
 
 use dioxus::prelude::*;
 use dioxus::{html::HasFileData, prelude::dioxus_elements::FileEngine};
+use dioxus::desktop::{Config, WindowBuilder};
 
 use indicatif::HumanCount;
 
@@ -15,7 +17,13 @@ mod modules;
 
 
 fn main() {
-    launch(app);
+    LaunchBuilder::desktop()
+        .with_cfg(
+        Config::new()
+                    .with_window(WindowBuilder::new().with_focused(true)
+                )
+        )
+        .launch(app)
 }
 struct UploadedFile {
     name: String,
@@ -49,16 +57,16 @@ fn app() -> Element {
 
     let read_files = move |file_engine: Arc<dyn FileEngine>| async move {
         let files = file_engine.files();
-        for file_name in &files {
+        to_owned![files];
+        for file in &files {
             let mut nreads: u64 = 0;
             let mut nbases: u64 = 0;
             let mut qual20: i64 = 0;
             let mut qual30: i64 = 0;
             let mut len_vector: Vec<i64> = Vec::new();
-            // decide which reader to use based on extension
 
-            if let Some(bytes) = file_engine.read_file(&file_name).await {
-                let recs2 = decode_reader(bytes, file_name).await.unwrap();
+            if let Some(bytes) = file_engine.read_file(&file).await {
+                let recs2 = decode_reader(bytes, file).await.unwrap();
                 let mut recs = fastq::Reader::new(recs2.as_bytes()).records();
                     
                 while let Some(Ok(rec)) = recs.next() {
@@ -71,7 +79,7 @@ fn app() -> Element {
                 let n50 = modules::get_nx(&mut len_vector, 0.5);
 
                 files_uploaded.write().push(UploadedFile {
-                    name: file_name.clone(),
+                    name: file.clone(),
                     //contents,
                     reads: nreads,
                     bases: nbases,
@@ -94,6 +102,7 @@ fn app() -> Element {
     };
     
     let downloadtable = "<a> Download table </a>";
+
     rsx! {
         style { 
             {include_str!("../assets/custom.css")} 
@@ -104,8 +113,8 @@ fn app() -> Element {
         }
         div {
             p{
-            "This is a Wasm application that runs basic analysis on sequencing files in fastq format. 
-            Select or drop .fastq or .fastq.gz files to analyse. All is done in the browser, no data is sent out" 
+            "This application runs basic analysis on sequencing files in fastq format. 
+            Select or drop .fastq or .fastq.gz files to analyse" 
             }
         }
         div {
@@ -145,7 +154,7 @@ fn app() -> Element {
             button {
                 class: "usercontrols",
                 dangerous_inner_html: "{downloadtable}",
-                //onclick: move |_| ,
+                //onclick: move |_|  async move {mymessage}
             
             }
             }
@@ -174,7 +183,7 @@ fn app() -> Element {
                     class: "loader",
                 }
                 p {
-                    "Please wait ..."
+                    "Please wait... {files_uploaded.len()} files processed"
                 }
             }
         }

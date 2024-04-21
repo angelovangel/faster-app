@@ -8,24 +8,26 @@ edition = "2021"
 
 [dependencies]
 
-dioxus = { version = "0.5", features = ["web", "router"] }
+dioxus = { version = "0.5", features = ["desktop"] }
 bio = "1.6.0"
 getrandom = { version = "0.2", features = ["js"] }
 indicatif = "0.17.8"
 flate2 = "1.0"
 rayon = "1.5"
+rfd = "0.14.1"
 
 # Debug
 log = "0.4.19"
 dioxus-logger = "0.4.1"
 console_error_panic_hook = "0.1.7"
 
+
 # added according to dioxus docs to minimize size
 [release]
-opt-level = "z"
-debug = false
-lto = true
-codegen-units = 1
-panic = "abort"
-strip = true
-incremental = false
+# opt-level = "z"
+# debug = false
+# lto = true
+# codegen-units = 1
+# panic = "abort"
+# strip = true
+# incremental = false

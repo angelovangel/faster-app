@@ -5,16 +5,16 @@ name = "faster-app"
 
 # Dioxus App Default Platform
 # desktop, web
-default_platform = "web"
+default_platform = "desktop"
 
 # `build` & `serve` dist path
-out_dir = "docs"
+out_dir = "build"
 
 # resource (assets) file folder
 asset_dir = "assets"
 
 [web.app]
-base_path = "faster-app"
+#base_path = "faster-app"
 
 # HTML title tag content
 title = "faster-app"

@@ -1,0 +1,121 @@
+@import url(https://fonts.googleapis.com/css?family=Open+Sans:400,600);
+body {
+    font-family: sans-serif;
+    font-size: 1em;
+    margin: 1em;
+    padding: 10px;
+    background-color: #f4f4f4;
+    justify-content: left;
+    align-items: left;
+    min-height: 100vh;
+}
+
+p {
+  margin: 0.5em;
+}
+
+.vertLine {
+  border-right:1px #ff0000;    /* line 1 pixel width, length of "Some content" */
+}
+
+.right {
+  margin: 1em;
+  float: right;
+}
+
+#drop-zone {
+    border: 2px dashed #ccc;
+    border-radius: 3px;
+    padding: 20px;
+    text-align: center;
+    cursor: pointer;
+    margin: 0.5em;
+    background-color: #2E86C1;
+}
+
+#title {
+    color: #2E86C1;
+    margin: 0.5em;
+    text-align: center;
+}
+
+
+*, *:before, *:after {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+table {
+  background: #f4f4f4;
+  border-radius: 0.25em;
+  border-collapse: collapse;
+  margin: 1em;
+}
+th {
+  border-bottom: 1px solid #21618C;
+  color: #2E86C1;
+  font-size: 1em;
+  font-weight: 600;
+  padding: 0.5em 1em;
+  text-align: right;
+}
+td {
+  color: #100f0f;
+  font-weight: 400;
+  font-size: 0.85em;
+  padding: 0.65em 1em;
+  text-align: right;
+}
+tbody tr {
+  transition: background 0.25s ease;
+}
+
+tbody tr:last-child td {
+  color: #2E86C1;
+  font-weight: 600;
+}
+
+tbody tr:hover {
+  background: #d2d7d8;
+}
+
+
+.usercontrols {
+  cursor: pointer;
+  margin: 0.5em;
+  outline: 1;
+  display: inline-block;
+  font-weight: 400;
+  line-height: 1.5;
+  text-align: center;
+  background-color: transparent;
+  border: 1px solid transparent;
+  padding: 6px 12px;
+  font-size: 1rem;
+  border-radius: .25rem;
+  transition: color .15s ease-in-out,background-color .15s ease-in-out,border-color .15s ease-in-out,box-shadow .15s ease-in-out;
+  
+  border-color: #2E86C1;
+}
+
+.usercontrols:hover {
+  color: #fff;
+  background-color: #2E86C1;
+  border-color: #2E86C1;
+}
+
+.loader {
+  width: 100.8px;
+  height: 16.8px;
+  -webkit-mask: linear-gradient(90deg,#2e86c1 70%,#0000 0) left/20% 100%;
+  background: linear-gradient(#2e86c1 0 0) left/0% 100% no-repeat
+      #dbdcef;
+  animation: progress-422c3u 2s infinite steps(6);
+}
+
+@keyframes progress-422c3u {
+  100% {
+     background-size: 120% 100%;
+  }
+}
