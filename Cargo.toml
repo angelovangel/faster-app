@@ -1,5 +1,5 @@
 [package]
-name = "faster-app"
+name = "fasterx"
 version = "0.1.0"
 authors = ["angelovangel <aangeloo@gmail.com>"]
 edition = "2021"
@@ -23,10 +23,10 @@ console_error_panic_hook = "0.1.7"
 
 # added according to dioxus docs to minimize size
 [release]
-# opt-level = "z"
-# debug = false
-# lto = true
-# codegen-units = 1
-# panic = "abort"
-# strip = true
-# incremental = false
+opt-level = "z"
+debug = false
+lto = true
+codegen-units = 1
+panic = "abort"
+strip = true
+incremental = false

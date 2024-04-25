@@ -7,7 +7,7 @@ use bio::io::fastq;
 use flate2::read::MultiGzDecoder;
 
 use dioxus::prelude::*;
-use dioxus::{html::HasFileData, prelude::dioxus_elements::FileEngine};
+use dioxus::prelude::dioxus_elements::FileEngine;
 use dioxus::desktop::{Config, WindowBuilder};
 
 use indicatif::HumanCount;
@@ -17,10 +17,7 @@ mod modules;
 
 fn main() {
     LaunchBuilder::desktop()
-        .with_cfg(
-        Config::new()
-                    .with_window(WindowBuilder::new().with_focused(true).with_title("faster-app")
-                )
+        .with_cfg(Config::new().with_window(WindowBuilder::new().with_focused(true).with_title("faster-app"))
         )
         .launch(app)
 }
@@ -46,17 +43,18 @@ async fn decode_reader(bytes: Vec<u8>, filename: &String) -> io::Result<String> 
 }
 
 fn app() -> Element {
+    let mut reads_processed = use_signal(|| 0);
     //let mut enable_directory_upload = use_signal(|| false);
     let mut pretty_numbers = use_signal(|| true);
     let mut files_uploaded = use_signal(|| Vec::new() as Vec<UploadedFile>);
     let mut total_reads = use_signal(|| 0);
     let mut total_bases = use_signal(|| 0);
-    let mut hovered = use_signal(|| false);
+    //let mut hovered = use_signal(|| false);
     let mut busy = use_signal(|| false);
 
     let read_files = move |file_engine: Arc<dyn FileEngine>| async move {
         let files = file_engine.files();
-        to_owned![files];
+        //to_owned![files];
         for file in &files {
             let mut nreads: u64 = 0;
             let mut nbases: u64 = 0;
@@ -70,16 +68,16 @@ fn app() -> Element {
                     
                 while let Some(Ok(rec)) = recs.next() {
                     nreads += 1;
+                    reads_processed += 1;
                     nbases += rec.seq().len() as u64;
                     qual20 += modules::get_qual_bases(rec.qual(), 53); // 33 offset
                     qual30 += modules::get_qual_bases(rec.qual(), 63); // 33 offset
-                    len_vector.push(rec.seq().len() as i64);
+                    len_vector.push(rec.seq().len() as i64);   
                 }
                 let n50 = modules::get_nx(&mut len_vector, 0.5);
 
                 files_uploaded.write().push(UploadedFile {
                     name: file.clone(),
-                    //contents,
                     reads: nreads,
                     bases: nbases,
                     q20: format!("{:.2}", qual20 as f64 / nbases as f64 * 100.0),
@@ -126,7 +124,7 @@ fn app() -> Element {
                 name: "textreader",
                 //directory: enable_directory_upload,
                 directory: false,
-                onchange: upload_files,
+                onchange: upload_files
             }
 
             label {""}
@@ -139,6 +137,7 @@ fn app() -> Element {
                 },
                 "Clear" 
             }
+            
         //}
         //div {
             if files_uploaded.len() > 0{
@@ -153,30 +152,29 @@ fn app() -> Element {
             button {
                 class: "usercontrols",
                 dangerous_inner_html: "{downloadtable}",
-                //onclick: move |_|  async move {mymessage}
+                //onclick: open_compose_window
             
             }
             }
         }
-        div {
-            id: "drop-zone",
-            prevent_default: "ondragover ondrop",
-            background_color: if hovered() { "#3498DB" } else { "#D6EAF8" },
-            ondragover: move |_| hovered.set(true),
-            ondragleave: move |_| hovered.set(false),
-            ondrop: move |evt| async move {
-                hovered.set(false);
-                if let Some(file_engine) = evt.files() {
-                    busy.set(true);
-                    read_files(file_engine).await;
-                    busy.set(false);
-                }
-            },
-            "Drop files here"
-        }
+        // div {
+        //     id: "drop-zone",
+        //     prevent_default: "ondragover ondrop",
+        //     background_color: if hovered() { "#3498DB" } else { "#D6EAF8" },
+        //     ondragover: move |_| hovered.set(true),
+        //     ondragleave: move |_| hovered.set(false),
+        //     ondrop: move |evt| async move {
+        //         hovered.set(false);
+        //         if let Some(file_engine) = evt.files() {
+        //             busy.set(true);
+        //             read_files(file_engine).await;
+        //             busy.set(false);
+        //         }
+        //     },
+        //     "Drop files here"
+        // }
         if busy() {
             div {
-                dialog {"test"}
                 // this loader should run on separate thread
                 div {
                     class: "loader",
