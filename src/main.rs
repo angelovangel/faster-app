@@ -8,7 +8,7 @@ use flate2::read::MultiGzDecoder;
 
 use dioxus::prelude::*;
 use dioxus::prelude::dioxus_elements::FileEngine;
-use dioxus::desktop::{Config, WindowBuilder};
+use dioxus::desktop::{Config, LogicalSize, WindowBuilder};
 
 use indicatif::HumanCount;
 
@@ -17,7 +17,13 @@ mod modules;
 
 fn main() {
     LaunchBuilder::desktop()
-        .with_cfg(Config::new().with_window(WindowBuilder::new().with_focused(true).with_title("faster-app"))
+        .with_cfg(
+            Config::new()
+                .with_window(WindowBuilder::new()
+                    .with_focused(true)
+                    .with_title("fasterx")
+                    .with_inner_size(LogicalSize::new(1200, 700))
+                )
         )
         .launch(app)
 }
@@ -26,6 +32,7 @@ struct UploadedFile {
     reads: u64,
     bases: u64,
     nx: u64,
+    gc: String,
     q20: String,
     q30: String
 }
@@ -58,16 +65,18 @@ fn app() -> Element {
         for file in &files {
             let mut nreads: u64 = 0;
             let mut nbases: u64 = 0;
+            let mut gcbases: u64 = 0;
             let mut qual20: i64 = 0;
             let mut qual30: i64 = 0;
             let mut len_vector: Vec<i64> = Vec::new();
 
             if let Some(bytes) = file_engine.read_file(&file).await {
-                let recs2 = decode_reader(bytes, file).await.unwrap();
-                let mut recs = fastq::Reader::new(recs2.as_bytes()).records();
+                let strings = decode_reader(bytes, file).await.unwrap();
+                let mut recs = fastq::Reader::new(strings.as_bytes()).records();
                     
                 while let Some(Ok(rec)) = recs.next() {
                     nreads += 1;
+                    gcbases += modules::get_gc_bases(rec.seq());
                     reads_processed += 1;
                     nbases += rec.seq().len() as u64;
                     qual20 += modules::get_qual_bases(rec.qual(), 53); // 33 offset
@@ -82,7 +91,8 @@ fn app() -> Element {
                     bases: nbases,
                     q20: format!("{:.2}", qual20 as f64 / nbases as f64 * 100.0),
                     q30: format!("{:.2}", qual30 as f64 / nbases as f64 * 100.0),
-                    nx: n50 as u64
+                    nx: n50 as u64,
+                    gc: format!("{:.2}", gcbases as f64 / nbases as f64 * 100.0)
                 });
                 total_bases += nbases;
                 total_reads += nreads;
@@ -193,6 +203,7 @@ fn app() -> Element {
                     th {"Reads"}
                     th {"Bases"}
                     th {"N50"}
+                    th {"GC%"}
                     th {"Q20%"}
                     th {"Q30%"}
                 }
@@ -205,6 +216,7 @@ fn app() -> Element {
                             td {"{HumanCount(file.reads)}"}
                             td {"{HumanCount(file.bases)}"}
                             td {"{HumanCount(file.nx)}"}
+                            td {"{file.gc}"}
                             td {"{file.q20}"}
                             td {"{file.q30}"}
                             }
@@ -221,6 +233,7 @@ fn app() -> Element {
                             td {"{file.reads}"}
                             td {"{file.bases}"}
                             td {"{file.nx}"}
+                            td {"{file.gc}"}
                             td {"{file.q20}"}
                             td {"{file.q30}"}
                             }

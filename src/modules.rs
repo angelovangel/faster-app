@@ -30,3 +30,13 @@ pub fn get_qual_bases(q: &[u8], qx: u8) -> i64 {
     }
     n
 }
+
+pub fn get_gc_bases(seq: &[u8]) -> u64 {
+    let mut n: u64 = 0;
+    for s in seq {
+        if matches!(s, &103u8 | &71u8 |  &99u8 | &67u8) { //G, g, C or c
+            n += 1;
+        }
+    }
+        n
+}
