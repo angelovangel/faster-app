@@ -38,5 +38,5 @@ pub fn get_gc_bases(seq: &[u8]) -> u64 {
             n += 1;
         }
     }
-        n
+    n
 }

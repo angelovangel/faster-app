@@ -11,9 +11,9 @@ use dioxus::prelude::dioxus_elements::FileEngine;
 use dioxus::desktop::{Config, LogicalSize, WindowBuilder};
 
 use indicatif::HumanCount;
+use human_repr::HumanCount as HC;
 
 mod modules;
-
 
 fn main() {
     LaunchBuilder::desktop()
@@ -49,10 +49,55 @@ async fn decode_reader(bytes: Vec<u8>, filename: &String) -> io::Result<String> 
    }
 }
 
+fn maketable(
+    entries: Signal<Vec<UploadedFile>>, 
+    numbers_type: String,
+    treads: Signal<u64>,
+    tbases: Signal<u64>
+) -> Element {
+    rsx! {
+        for f in entries.read().iter() {
+            tr {
+            td {"{f.name}"}
+            if numbers_type =="comma" {
+                td {"{HumanCount(f.reads)}"}
+                td {"{HumanCount(f.bases)}"}
+                td {"{HumanCount(f.nx)}"}
+            } else if numbers_type == "human" {
+                td {"{f.reads.human_count_bare()}"}
+                td {"{f.bases.human_count_bare()}"}
+                td {"{f.nx.human_count_bare()}"}
+            } else {
+                td {"{f.reads}"}
+                td {"{f.bases}"}
+                td {"{f.nx}"}
+            }
+            td {"{f.gc}"}
+            td {"{f.q20}"}
+            td {"{f.q30}"}
+            }
+        }
+        tr {
+            td {"Total"}
+            if numbers_type == "comma" {
+                td {"{HumanCount(treads())}"}
+                td {"{HumanCount(tbases())}"}
+            } else if numbers_type == "human" {
+                td {"{treads().human_count_bare()}"}
+                td {"{tbases().human_count_bare()}"}
+            } else {
+                td {"{treads()}"}
+                td {"{tbases()}"}
+            }
+        }
+    }
+}
+
 fn app() -> Element {
     let mut reads_processed = use_signal(|| 0);
     //let mut enable_directory_upload = use_signal(|| false);
-    let mut pretty_numbers = use_signal(|| true);
+    let mut numbers = use_signal(|| String::new());
+    //let mut human_numbers = use_signal(|| false);
     let mut files_uploaded = use_signal(|| Vec::new() as Vec<UploadedFile>);
     let mut total_reads = use_signal(|| 0);
     let mut total_bases = use_signal(|| 0);
@@ -108,7 +153,7 @@ fn app() -> Element {
         }
     };
     
-    let downloadtable = "<a> Download table </a>";
+//    let downloadtable = "<a> Download table </a>";
 
     rsx! {
         style { 
@@ -148,23 +193,19 @@ fn app() -> Element {
                 "Clear" 
             }
             
-        //}
-        //div {
             if files_uploaded.len() > 0{
-            label { r#for: "pretty-numbers", "Use thousands separator" }
-            input {
-                class: "usercontrols",
-                r#type: "checkbox",
-                checked: pretty_numbers,
-                oninput: move |evt| pretty_numbers.set(evt.checked()),
-            }
-            label {""}
-            button {
-                class: "usercontrols",
-                dangerous_inner_html: "{downloadtable}",
-                //onclick: open_compose_window
-            
-            }
+                label {r#for: "numbers", "Number format: "}
+                select {
+                    r#name: "numbers", id: "numbers",
+                    class: "usercontrols",
+                    multiple: false,
+                    oninput: move |ev| {
+                        numbers.set(ev.value())
+                    },
+                    option {value: "none", "Plain numeric"},
+                    option {value: "comma", "Thousands sep"},
+                    option {value: "human", "SI suffix"}
+                }
             }
         }
         // div {
@@ -209,43 +250,9 @@ fn app() -> Element {
                 }
                 }
                 tbody {
-                    if pretty_numbers() {
-                        for file in files_uploaded.read().iter() {
-                            tr {
-                            td {"{file.name}"}
-                            td {"{HumanCount(file.reads)}"}
-                            td {"{HumanCount(file.bases)}"}
-                            td {"{HumanCount(file.nx)}"}
-                            td {"{file.gc}"}
-                            td {"{file.q20}"}
-                            td {"{file.q30}"}
-                            }
-                        }
-                        tr {
-                        td {"Total"}
-                        td {"{HumanCount(total_reads())}"}
-                        td {"{HumanCount(total_bases())}"}
-                        }
-                    } else {
-                        for file in files_uploaded.read().iter() {
-                            tr {
-                            td {"{file.name}"}
-                            td {"{file.reads}"}
-                            td {"{file.bases}"}
-                            td {"{file.nx}"}
-                            td {"{file.gc}"}
-                            td {"{file.q20}"}
-                            td {"{file.q30}"}
-                            }
-                        }
-                        tr {
-                        td {"Total"}
-                        td {"{total_reads}"}
-                        td {"{total_bases}"}
-                        }
-                    }
+                    {maketable(files_uploaded, numbers(), total_reads, total_bases)}
                 }
-        }
+            }
         }
     }
 }

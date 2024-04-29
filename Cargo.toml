@@ -12,6 +12,7 @@ dioxus = { version = "0.5", features = ["desktop"] }
 bio = "1.6.0"
 getrandom = { version = "0.2", features = ["js"] }
 indicatif = "0.17.8"
+human-repr = "1"
 flate2 = "1.0"
 rayon = "1.5"
 
