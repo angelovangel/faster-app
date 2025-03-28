@@ -3,6 +3,11 @@
 # App (Project) Name
 name = "fasterx"
 
+[bundle]
+identifier = "angelovangel.github.com"
+publisher = "Angel Angelov"
+icon = ["assets/favicon.png"]
+
 # Dioxus App Default Platform
 # desktop, web
 default_platform = "desktop"

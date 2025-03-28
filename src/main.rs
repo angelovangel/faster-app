@@ -1,6 +1,7 @@
 
 use std::sync::Arc;
 use std::io;
+use std::path::Path;
 use std::io::prelude::*;
 
 use bio::io::fastq;
@@ -54,7 +55,7 @@ fn maketable(
     numbers_type: String,
     treads: Signal<u64>,
     tbases: Signal<u64>
-) -> Element {
+    ) -> Element {
     rsx! {
         for f in entries.read().iter() {
             tr {
@@ -116,6 +117,8 @@ fn app() -> Element {
             let mut len_vector: Vec<i64> = Vec::new();
 
             if let Some(bytes) = file_engine.read_file(&file).await {
+                let filepath = Path::new(&file);
+                let basename = filepath.file_name().unwrap().to_str().unwrap();
                 let strings = decode_reader(bytes, file).await.unwrap();
                 let mut recs = fastq::Reader::new(strings.as_bytes()).records();
                     
@@ -131,7 +134,8 @@ fn app() -> Element {
                 let n50 = modules::get_nx(&mut len_vector, 0.5);
 
                 files_uploaded.write().push(UploadedFile {
-                    name: file.clone(),
+                    //name: file.clone(),
+                    name: basename.to_string(),
                     reads: nreads,
                     bases: nbases,
                     q20: format!("{:.2}", qual20 as f64 / nbases as f64 * 100.0),
