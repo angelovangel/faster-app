@@ -102,7 +102,10 @@ fn maketable(
     }
 }
 
-fn copy_to_clipboard(f_uploaded: Signal<Vec<UploadedFile>>) {
+fn copy_to_clipboard(
+    f_uploaded: Signal<Vec<UploadedFile>>
+    //mut show_popup: Signal<bool>
+    ) {
     let mut csv_data = String::new();
     for file in f_uploaded.read().iter() {
         csv_data.push_str(&format!(
@@ -128,12 +131,11 @@ fn app() -> Element {
     //let mut enable_directory_upload = use_signal(|| false);
     let mut numbers = use_signal(|| String::new());
     let mut name_type_sig = use_signal(|| String::new());
-    //let mut human_numbers = use_signal(|| false);
     let mut files_uploaded = use_signal(|| Vec::new() as Vec<UploadedFile>);
     let mut total_reads = use_signal(|| 0);
     let mut total_bases = use_signal(|| 0);
-    //let mut hovered = use_signal(|| false);
     let busy = use_signal(|| false);
+    let mut show_popup = use_signal(|| false);
 
     let read_files = move |file_engine: Arc<dyn FileEngine>| async move {
         let files = file_engine.files();
@@ -231,6 +233,13 @@ fn app() -> Element {
                     class: "usercontrols",
                     onclick: move |_| {
                         copy_to_clipboard(files_uploaded.clone());
+                        show_popup.set(true);
+
+                        // Use an async task to handle the delay, dioxus::prelude::spawn()
+                        spawn(async move {
+                            tokio::time::sleep(std::time::Duration::from_secs(2)).await;
+                            show_popup.set(false);
+                        });
                     },
                     "Copy table to clipboard"
                 }
@@ -289,6 +298,13 @@ fn app() -> Element {
                 tbody {
                     {maketable(files_uploaded, name_type_sig(), numbers(), total_reads, total_bases)}
                 }
+            }
+        }
+
+        if *show_popup.read() {
+            div {
+                class: "popup",
+                "Copied to clipboard!"
             }
         }
     }
