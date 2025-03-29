@@ -30,6 +30,7 @@ fn main() {
 }
 struct UploadedFile {
     name: String,
+    basename: String,
     reads: u64,
     bases: u64,
     nx: u64,
@@ -51,7 +52,8 @@ async fn decode_reader(bytes: Vec<u8>, filename: &String) -> io::Result<String> 
 }
 
 fn maketable(
-    entries: Signal<Vec<UploadedFile>>, 
+    entries: Signal<Vec<UploadedFile>>,
+    name_type: String,
     numbers_type: String,
     treads: Signal<u64>,
     tbases: Signal<u64>
@@ -59,7 +61,11 @@ fn maketable(
     rsx! {
         for f in entries.read().iter() {
             tr {
-            td {"{f.name}"}
+            if name_type == "fullpath" {
+                td {"{f.name}"}
+            } else {
+                td {"{f.basename}"}
+            }
             if numbers_type =="comma" {
                 td {"{HumanCount(f.reads)}"}
                 td {"{HumanCount(f.bases)}"}
@@ -79,7 +85,7 @@ fn maketable(
             }
         }
         tr {
-            td {"Total"}
+            td {"Total ({entries.len()} files)"}
             if numbers_type == "comma" {
                 td {"{HumanCount(treads())}"}
                 td {"{HumanCount(tbases())}"}
@@ -98,6 +104,7 @@ fn app() -> Element {
     let mut reads_processed = use_signal(|| 0);
     //let mut enable_directory_upload = use_signal(|| false);
     let mut numbers = use_signal(|| String::new());
+    let mut name_type_sig = use_signal(|| String::new());
     //let mut human_numbers = use_signal(|| false);
     let mut files_uploaded = use_signal(|| Vec::new() as Vec<UploadedFile>);
     let mut total_reads = use_signal(|| 0);
@@ -134,8 +141,8 @@ fn app() -> Element {
                 let n50 = modules::get_nx(&mut len_vector, 0.5);
 
                 files_uploaded.write().push(UploadedFile {
-                    //name: file.clone(),
-                    name: basename.to_string(),
+                    name: file.clone(),
+                    basename: basename.to_string(),
                     reads: nreads,
                     bases: nbases,
                     q20: format!("{:.2}", qual20 as f64 / nbases as f64 * 100.0),
@@ -170,7 +177,7 @@ fn app() -> Element {
         div {
             p{
             "This application runs basic analysis on sequencing files in fastq format. 
-            Select or drop .fastq or .fastq.gz files to analyse" 
+            Select fastq or fastq.gz files to analyse." 
             }
         }
         div {
@@ -192,13 +199,25 @@ fn app() -> Element {
                 onclick: move |_| {
                     files_uploaded.write().clear(); 
                     total_bases.set(0); 
-                    total_reads.set(0)
+                    total_reads.set(0);
+                    name_type_sig.set("basename".to_string())
                 },
                 "Clear" 
             }
             
             if files_uploaded.len() > 0{
-                label {r#for: "numbers", "Number format: "}
+                select {
+                    r#name: "name_type_sig",
+                    class: "usercontrols",
+                    multiple: "false",
+                    oninput: move |ev| {
+                        name_type_sig.set(ev.value())
+                    },
+                    option {value: "basename", "Base filename"}
+                    option {value: "fullpath", "Full path"},
+                }
+                
+                //label {r#for: "numbers", ""}
                 select {
                     r#name: "numbers", id: "numbers",
                     class: "usercontrols",
@@ -254,7 +273,7 @@ fn app() -> Element {
                 }
                 }
                 tbody {
-                    {maketable(files_uploaded, numbers(), total_reads, total_bases)}
+                    {maketable(files_uploaded, name_type_sig(), numbers(), total_reads, total_bases)}
                 }
             }
         }
