@@ -1,30 +1,32 @@
-
-use std::sync::Arc;
 use std::io;
-use std::path::Path;
 use std::io::prelude::*;
+use std::path::Path;
+use std::sync::Arc;
+
+use arboard::Clipboard;
 
 use bio::io::fastq;
 use flate2::read::MultiGzDecoder;
 
-use dioxus::prelude::*;
-use dioxus::prelude::dioxus_elements::FileEngine;
 use dioxus::desktop::{Config, LogicalSize, WindowBuilder};
+use dioxus::prelude::dioxus_elements::FileEngine;
+use dioxus::prelude::*;
 
-use indicatif::HumanCount;
 use human_repr::HumanCount as HC;
+use indicatif::HumanCount;
 
 mod modules;
+mod components;
 
 fn main() {
     LaunchBuilder::desktop()
         .with_cfg(
-            Config::new()
-                .with_window(WindowBuilder::new()
+            Config::new().with_window(
+                WindowBuilder::new()
                     .with_focused(true)
                     .with_title("fasterx")
-                    .with_inner_size(LogicalSize::new(1200, 700))
-                )
+                    .with_inner_size(LogicalSize::new(1200, 700)),
+            ),
         )
         .launch(app)
 }
@@ -36,19 +38,19 @@ struct UploadedFile {
     nx: u64,
     gc: String,
     q20: String,
-    q30: String
+    q30: String,
 }
 
 async fn decode_reader(bytes: Vec<u8>, filename: &String) -> io::Result<String> {
-   if filename.ends_with(".gz") {
-       let mut gz = MultiGzDecoder::new(&bytes[..]);
-       let mut s = String::new();
-       gz.read_to_string(&mut s)?;
-       Ok(s)   
-   } else {
-       let s = String::from_utf8(bytes).unwrap();
-       Ok(s)
-   }
+    if filename.ends_with(".gz") {
+        let mut gz = MultiGzDecoder::new(&bytes[..]);
+        let mut s = String::new();
+        gz.read_to_string(&mut s)?;
+        Ok(s)
+    } else {
+        let s = String::from_utf8(bytes).unwrap();
+        Ok(s)
+    }
 }
 
 fn maketable(
@@ -56,8 +58,8 @@ fn maketable(
     name_type: String,
     numbers_type: String,
     treads: Signal<u64>,
-    tbases: Signal<u64>
-    ) -> Element {
+    tbases: Signal<u64>,
+) -> Element {
     rsx! {
         for f in entries.read().iter() {
             tr {
@@ -100,6 +102,27 @@ fn maketable(
     }
 }
 
+fn copy_to_clipboard(f_uploaded: Signal<Vec<UploadedFile>>) {
+    let mut csv_data = String::new();
+    for file in f_uploaded.read().iter() {
+        csv_data.push_str(&format!(
+            "{},{},{},{},{},{},{}\n",
+            //file.name,
+            file.basename,
+            file.reads,
+            file.bases,
+            file.nx,
+            file.gc,
+            file.q20,
+            file.q30
+        ));
+    }
+
+    // Use the `arboard` crate to copy the data to the clipboard
+    let mut clipboard = Clipboard::new().unwrap();
+    clipboard.set_text(csv_data).unwrap();
+}
+
 fn app() -> Element {
     let mut reads_processed = use_signal(|| 0);
     //let mut enable_directory_upload = use_signal(|| false);
@@ -110,7 +133,7 @@ fn app() -> Element {
     let mut total_reads = use_signal(|| 0);
     let mut total_bases = use_signal(|| 0);
     //let mut hovered = use_signal(|| false);
-    let mut busy = use_signal(|| false);
+    let busy = use_signal(|| false);
 
     let read_files = move |file_engine: Arc<dyn FileEngine>| async move {
         let files = file_engine.files();
@@ -128,7 +151,7 @@ fn app() -> Element {
                 let basename = filepath.file_name().unwrap().to_str().unwrap();
                 let strings = decode_reader(bytes, file).await.unwrap();
                 let mut recs = fastq::Reader::new(strings.as_bytes()).records();
-                    
+
                 while let Some(Ok(rec)) = recs.next() {
                     nreads += 1;
                     gcbases += modules::get_gc_bases(rec.seq());
@@ -136,7 +159,7 @@ fn app() -> Element {
                     nbases += rec.seq().len() as u64;
                     qual20 += modules::get_qual_bases(rec.qual(), 53); // 33 offset
                     qual30 += modules::get_qual_bases(rec.qual(), 63); // 33 offset
-                    len_vector.push(rec.seq().len() as i64);   
+                    len_vector.push(rec.seq().len() as i64);
                 }
                 let n50 = modules::get_nx(&mut len_vector, 0.5);
 
@@ -148,38 +171,36 @@ fn app() -> Element {
                     q20: format!("{:.2}", qual20 as f64 / nbases as f64 * 100.0),
                     q30: format!("{:.2}", qual30 as f64 / nbases as f64 * 100.0),
                     nx: n50 as u64,
-                    gc: format!("{:.2}", gcbases as f64 / nbases as f64 * 100.0)
+                    gc: format!("{:.2}", gcbases as f64 / nbases as f64 * 100.0),
                 });
                 total_bases += nbases;
                 total_reads += nreads;
-            } 
+            }
         }
     };
 
-    let upload_files = move |evt: FormEvent| async move {
-        if let Some(file_engine) = evt.files() {
-            busy.set(true);
-            read_files(file_engine).await;
-            busy.set(false);
+
+    let upload_files = move |evt: FormEvent| {
+        let mut busy = busy.clone();
+        let read_files = read_files.clone();
+        async move {
+            if let Some(file_engine) = evt.files() {
+                busy.set(true);
+                read_files(file_engine).await; // Properly await the async function
+                busy.set(false);
+            }
         }
     };
+
+    //    let downloadtable = "<a> Download table </a>";
     
-//    let downloadtable = "<a> Download table </a>";
-
     rsx! {
         style { 
             {include_str!("../assets/custom.css")} 
         }
-        div {
-            id: "title",
-            h2 { "Simple fastx file analysis" }
-        }
-        div {
-            p{
-            "This application runs basic analysis on sequencing files in fastq format. 
-            Select fastq or fastq.gz files to analyse." 
-            }
-        }
+        
+        components::app_title {}
+        
         div {
             label { r#for: "textreader", "" }
             input {
@@ -197,15 +218,23 @@ fn app() -> Element {
             button {
                 class: "usercontrols",
                 onclick: move |_| {
-                    files_uploaded.write().clear(); 
-                    total_bases.set(0); 
+                    files_uploaded.write().clear();
+                    total_bases.set(0);
                     total_reads.set(0);
                     name_type_sig.set("basename".to_string())
                 },
-                "Clear" 
+                "Clear"
             }
-            
+
             if files_uploaded.len() > 0{
+                button {
+                    class: "usercontrols",
+                    onclick: move |_| {
+                        copy_to_clipboard(files_uploaded.clone());
+                    },
+                    "Copy table to clipboard"
+                }
+                
                 select {
                     r#name: "name_type_sig",
                     class: "usercontrols",
@@ -216,7 +245,7 @@ fn app() -> Element {
                     option {value: "basename", "Base filename"}
                     option {value: "fullpath", "Full path"},
                 }
-                
+
                 //label {r#for: "numbers", ""}
                 select {
                     r#name: "numbers", id: "numbers",
@@ -231,23 +260,8 @@ fn app() -> Element {
                 }
             }
         }
-        // div {
-        //     id: "drop-zone",
-        //     prevent_default: "ondragover ondrop",
-        //     background_color: if hovered() { "#3498DB" } else { "#D6EAF8" },
-        //     ondragover: move |_| hovered.set(true),
-        //     ondragleave: move |_| hovered.set(false),
-        //     ondrop: move |evt| async move {
-        //         hovered.set(false);
-        //         if let Some(file_engine) = evt.files() {
-        //             busy.set(true);
-        //             read_files(file_engine).await;
-        //             busy.set(false);
-        //         }
-        //     },
-        //     "Drop files here"
-        // }
-        if busy() {
+
+        if *busy.read() {
             div {
                 // this loader should run on separate thread
                 div {
