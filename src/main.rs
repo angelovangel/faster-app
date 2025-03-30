@@ -134,7 +134,7 @@ fn app() -> Element {
     let mut files_uploaded = use_signal(|| Vec::new() as Vec<UploadedFile>);
     let mut total_reads = use_signal(|| 0);
     let mut total_bases = use_signal(|| 0);
-    let busy = use_signal(|| false);
+    let mut busy = use_signal(|| false);
     let mut show_popup = use_signal(|| false);
 
     let read_files = move |file_engine: Arc<dyn FileEngine>| async move {
@@ -183,18 +183,18 @@ fn app() -> Element {
 
 
     let upload_files = move |evt: FormEvent| {
-        let mut busy = busy.clone();
-        let read_files = read_files.clone();
-        async move {
+        //let mut busy = busy.clone();
+        //let read_files = read_files.clone();
+        //async move {
             if let Some(file_engine) = evt.files() {
                 busy.set(true);
-                read_files(file_engine).await; // Properly await the async function
-                busy.set(false);
+                spawn(async move { 
+                    read_files(file_engine).await;
+                    busy.set(false);
+                });
             }
-        }
+        //}
     };
-
-    //    let downloadtable = "<a> Download table </a>";
     
     rsx! {
         style { 
@@ -270,17 +270,6 @@ fn app() -> Element {
             }
         }
 
-        if *busy.read() {
-            div {
-                // this loader should run on separate thread
-                div {
-                    class: "loader",
-                }
-                p {
-                    "Please wait... {files_uploaded.len()} files processed"
-                }
-            }
-        }
         if files_uploaded.len() > 0 {
             table {
                 id: "resultstable",
@@ -301,10 +290,17 @@ fn app() -> Element {
             }
         }
 
+        if *busy.read() {
+            
+                div {
+                    class: "popup",
+                    "Please wait... {files_uploaded.len()} files processed"
+                }
+        }
         if *show_popup.read() {
             div {
                 class: "popup",
-                "Copied to clipboard!"
+                "{files_uploaded.len()} entries copied to clipboard!"
             }
         }
     }
