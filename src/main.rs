@@ -1,7 +1,7 @@
 use std::io;
-use std::io::prelude::*;
 use std::path::Path;
 use std::sync::Arc;
+use std::io::Cursor;
 
 use arboard::Clipboard;
 
@@ -41,15 +41,14 @@ struct UploadedFile {
     q30: String,
 }
 
-async fn decode_reader(bytes: Vec<u8>, filename: &String) -> io::Result<String> {
+async fn decode_reader(bytes: Vec<u8>, filename: &String) -> io::Result<Box<dyn io::Read + Send>> {
     if filename.ends_with(".gz") {
-        let mut gz = MultiGzDecoder::new(&bytes[..]);
-        let mut s = String::new();
-        gz.read_to_string(&mut s)?;
-        Ok(s)
+        // Use a Cursor to wrap the bytes and pass it to MultiGzDecoder
+        let gz = MultiGzDecoder::new(Cursor::new(bytes));
+        Ok(Box::new(gz))
     } else {
-        let s = String::from_utf8(bytes).unwrap();
-        Ok(s)
+        // Wrap the bytes in a Cursor for non-gzipped files
+        Ok(Box::new(Cursor::new(bytes)))
     }
 }
 
@@ -127,19 +126,22 @@ fn copy_to_clipboard(
 }
 
 fn app() -> Element {
-    let mut reads_processed = use_signal(|| 0);
+    //let mut reads_processed = use_signal(|| 0);
     //let mut enable_directory_upload = use_signal(|| false);
     let mut numbers = use_signal(|| String::new());
     let mut name_type_sig = use_signal(|| String::new());
     let mut files_uploaded = use_signal(|| Vec::new() as Vec<UploadedFile>);
+    let mut files_count = use_signal(|| 0);
+    let mut reads_processed = use_signal(|| 0);
+    
     let mut total_reads = use_signal(|| 0);
     let mut total_bases = use_signal(|| 0);
+    
     let mut busy = use_signal(|| false);
     let mut show_popup = use_signal(|| false);
 
     let read_files = move |file_engine: Arc<dyn FileEngine>| async move {
         let files = file_engine.files();
-        //to_owned![files];
         for file in &files {
             let mut nreads: u64 = 0;
             let mut nbases: u64 = 0;
@@ -151,13 +153,13 @@ fn app() -> Element {
             if let Some(bytes) = file_engine.read_file(&file).await {
                 let filepath = Path::new(&file);
                 let basename = filepath.file_name().unwrap().to_str().unwrap();
-                let strings = decode_reader(bytes, file).await.unwrap();
-                let mut recs = fastq::Reader::new(strings.as_bytes()).records();
+                let reader = decode_reader(bytes, file).await.unwrap();
+                let mut recs = fastq::Reader::new(reader).records();
 
                 while let Some(Ok(rec)) = recs.next() {
+                    reads_processed.set(reads_processed() + 1);
                     nreads += 1;
                     gcbases += modules::get_gc_bases(rec.seq());
-                    reads_processed += 1;
                     nbases += rec.seq().len() as u64;
                     qual20 += modules::get_qual_bases(rec.qual(), 53); // 33 offset
                     qual30 += modules::get_qual_bases(rec.qual(), 63); // 33 offset
@@ -188,6 +190,8 @@ fn app() -> Element {
         //async move {
             if let Some(file_engine) = evt.files() {
                 busy.set(true);
+                files_count.set(file_engine.files().len());
+
                 spawn(async move { 
                     read_files(file_engine).await;
                     busy.set(false);
@@ -223,6 +227,7 @@ fn app() -> Element {
                     files_uploaded.write().clear();
                     total_bases.set(0);
                     total_reads.set(0);
+                    files_count.set(0);
                     name_type_sig.set("basename".to_string())
                 },
                 "Clear"
@@ -291,11 +296,10 @@ fn app() -> Element {
         }
 
         if *busy.read() {
-            
-                div {
-                    class: "popup",
-                    "Please wait... {files_uploaded.len()} files processed"
-                }
+            div {
+                class: "popup",
+                "Please wait... {files_uploaded.len()} of {files_count} files processed"
+            }
         }
         if *show_popup.read() {
             div {
