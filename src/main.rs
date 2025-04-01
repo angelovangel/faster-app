@@ -2,7 +2,7 @@ use std::io;
 use std::path::Path;
 use std::sync::Arc;
 use std::io::Cursor;
-
+use std::time::{Instant, Duration};
 use arboard::Clipboard;
 
 use bio::io::fastq;
@@ -13,7 +13,7 @@ use dioxus::prelude::dioxus_elements::FileEngine;
 use dioxus::prelude::*;
 
 use human_repr::HumanCount as HC;
-use indicatif::HumanCount;
+use indicatif::{HumanCount, HumanDuration};
 
 mod modules;
 mod components;
@@ -138,6 +138,9 @@ fn app() -> Element {
     let mut total_bases = use_signal(|| 0);
     
     let mut busy = use_signal(|| false);
+    let mut ready = use_signal(|| false);
+    let mut start_time = use_signal(|| Instant::now());
+    let mut myduration = use_signal(|| String::new());
     let mut show_popup = use_signal(|| false);
 
     let read_files = move |file_engine: Arc<dyn FileEngine>| async move {
@@ -185,19 +188,22 @@ fn app() -> Element {
 
 
     let upload_files = move |evt: FormEvent| {
-        //let mut busy = busy.clone();
-        //let read_files = read_files.clone();
-        //async move {
-            if let Some(file_engine) = evt.files() {
-                busy.set(true);
-                files_count.set(file_engine.files().len());
+        if let Some(file_engine) = evt.files() {
+            busy.set(true);
+            files_count.set(file_engine.files().len());
+            start_time.set(Instant::now()); // Record the start time
 
-                spawn(async move { 
-                    read_files(file_engine).await;
-                    busy.set(false);
-                });
-            }
-        //}
+            spawn(async move { 
+                read_files(file_engine).await; // Process all files
+                myduration.set(HumanDuration(Instant::now() - start_time()).to_string()); 
+
+                // Show the "ready" popup once
+                ready.set(true);
+                busy.set(false); 
+                tokio::time::sleep(std::time::Duration::from_secs(3)).await; // Wait for 3 seconds
+                ready.set(false); // Hide the popup
+            });
+        } 
     };
     
     rsx! {
@@ -242,7 +248,7 @@ fn app() -> Element {
 
                         // Use an async task to handle the delay, dioxus::prelude::spawn()
                         spawn(async move {
-                            tokio::time::sleep(std::time::Duration::from_secs(2)).await;
+                            tokio::time::sleep(Duration::from_secs(3)).await;
                             show_popup.set(false);
                         });
                     },
@@ -301,6 +307,14 @@ fn app() -> Element {
                 "Please wait... {files_uploaded.len()} of {files_count} files processed"
             }
         }
+
+        if *ready.read() {
+            div {
+                class: "popup",
+                "Finished processing {files_count} files in {myduration}!"
+            }
+        }
+
         if *show_popup.read() {
             div {
                 class: "popup",
