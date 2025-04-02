@@ -119,13 +119,6 @@ select.usercontrols {
   transition: border-color 0.3s ease; /* Smooth transition for hover/focus */
 }
 
-
-@keyframes progress-422c3u {
-  100% {
-     background-size: 120% 100%;
-  }
-}
-
 .popup {
     position: fixed;
     bottom: 20px;
@@ -161,4 +154,21 @@ select.usercontrols {
         opacity: 0;
         transform: translateY(10px);
     }
+}
+
+/* Container for the progress bar */
+.progress-bar-container {
+    width: 100%; /* Full width of the popup */
+    height: 10px; /* Height of the progress bar */
+    background-color: #e0e0e0; /* Light gray background */
+    border-radius: 5px; /* Rounded corners */
+    overflow: hidden; /* Ensure the progress bar stays within the container */
+    margin-top: 20px; /* Add spacing above the progress bar */
+}
+
+/* The progress bar itself */
+.progress-bar {
+    height: 100%; /* Full height of the container */
+    background-color: #2E86C1; /* Blue color for progress */
+    transition: width 0.1s ease; /* Smooth transition for width changes */
 }

@@ -126,13 +126,11 @@ fn copy_to_clipboard(
 }
 
 fn app() -> Element {
-    //let mut reads_processed = use_signal(|| 0);
     //let mut enable_directory_upload = use_signal(|| false);
     let mut numbers = use_signal(|| String::new());
     let mut name_type_sig = use_signal(|| String::new());
     let mut files_uploaded = use_signal(|| Vec::new() as Vec<UploadedFile>);
     let mut files_count = use_signal(|| 0);
-    let mut reads_processed = use_signal(|| 0);
     
     let mut total_reads = use_signal(|| 0);
     let mut total_bases = use_signal(|| 0);
@@ -141,6 +139,7 @@ fn app() -> Element {
     let mut ready = use_signal(|| false);
     let mut start_time = use_signal(|| Instant::now());
     let mut myduration = use_signal(|| String::new());
+    let mut progress_percentage = use_signal(|| 0.0);
     let mut show_popup = use_signal(|| false);
 
     let read_files = move |file_engine: Arc<dyn FileEngine>| async move {
@@ -160,7 +159,6 @@ fn app() -> Element {
                 let mut recs = fastq::Reader::new(reader).records();
 
                 while let Some(Ok(rec)) = recs.next() {
-                    reads_processed.set(reads_processed() + 1);
                     nreads += 1;
                     gcbases += modules::get_gc_bases(rec.seq());
                     nbases += rec.seq().len() as u64;
@@ -180,6 +178,10 @@ fn app() -> Element {
                     nx: n50 as u64,
                     gc: format!("{:.2}", gcbases as f64 / nbases as f64 * 100.0),
                 });
+
+                progress_percentage.set((files_uploaded.len() as f64 / *files_count.read() as f64) * 100.0);
+                tokio::task::yield_now().await; // Yield to allow the UI to update
+                tokio::time::sleep(std::time::Duration::from_millis(500)).await; // this makes sure that the progress is drawn
                 total_bases += nbases;
                 total_reads += nreads;
             }
@@ -192,7 +194,7 @@ fn app() -> Element {
             busy.set(true);
             files_count.set(file_engine.files().len());
             start_time.set(Instant::now()); // Record the start time
-
+            
             spawn(async move { 
                 read_files(file_engine).await; // Process all files
                 myduration.set(HumanDuration(Instant::now() - start_time()).to_string()); 
@@ -200,6 +202,7 @@ fn app() -> Element {
                 // Show the "ready" popup once
                 ready.set(true);
                 busy.set(false); 
+                progress_percentage.set(0.0);
                 tokio::time::sleep(std::time::Duration::from_secs(3)).await; // Wait for 3 seconds
                 ready.set(false); // Hide the popup
             });
@@ -234,7 +237,8 @@ fn app() -> Element {
                     total_bases.set(0);
                     total_reads.set(0);
                     files_count.set(0);
-                    name_type_sig.set("basename".to_string())
+                    name_type_sig.set("basename".to_string());
+                    progress_percentage.set(0.0);
                 },
                 "Clear"
             }
@@ -304,7 +308,14 @@ fn app() -> Element {
         if *busy.read() {
             div {
                 class: "popup",
-                "Please wait... {files_uploaded.len()} of {files_count} files processed"
+                "Please wait... {files_uploaded.len()} of {files_count} files processed",
+                div {
+                    class: "progress-bar-container",
+                    div {
+                        class: "progress-bar",
+                        style: "width: {progress_percentage()}%;",
+                    }
+                }
             }
         }
 
