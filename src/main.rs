@@ -9,7 +9,7 @@ use bio::io::fastq;
 use flate2::read::MultiGzDecoder;
 
 use dioxus::desktop::{Config, LogicalSize, WindowBuilder};
-use dioxus::prelude::dioxus_elements::FileEngine;
+//use dioxus::prelude::dioxus_elements::FileEngine;
 use dioxus::prelude::*;
 
 use human_repr::HumanCount as HC;
@@ -19,15 +19,17 @@ mod modules;
 mod components;
 
 fn main() {
+    let config = Config::new()
+    .with_window(
+        WindowBuilder::new()
+            .with_focused(true)
+            .with_title("fasterx")
+            .with_inner_size(LogicalSize::new(1200, 700)),
+    );
+    //.with_custom_head(custom_head.to_string());
+
     LaunchBuilder::desktop()
-        .with_cfg(
-            Config::new().with_window(
-                WindowBuilder::new()
-                    .with_focused(true)
-                    .with_title("fasterx")
-                    .with_inner_size(LogicalSize::new(1200, 700)),
-            ),
-        )
+        .with_cfg(config)
         .launch(app)
 }
 struct UploadedFile {
@@ -39,6 +41,7 @@ struct UploadedFile {
     gc: String,
     q20: String,
     q30: String,
+    m_qscore: u8
 }
 
 async fn decode_reader(bytes: Vec<u8>, filename: &String) -> io::Result<Box<dyn io::Read + Send>> {
@@ -83,6 +86,7 @@ fn maketable(
             td {"{f.gc}"}
             td {"{f.q20}"}
             td {"{f.q30}"}
+            td {"{f.m_qscore}"}
             }
         }
         tr {
@@ -108,7 +112,7 @@ fn copy_to_clipboard(
     let mut csv_data = String::new();
     for file in f_uploaded.read().iter() {
         csv_data.push_str(&format!(
-            "{},{},{},{},{},{},{}\n",
+            "{},{},{},{},{},{},{}.{}\n",
             //file.name,
             file.basename,
             file.reads,
@@ -116,7 +120,8 @@ fn copy_to_clipboard(
             file.nx,
             file.gc,
             file.q20,
-            file.q30
+            file.q30,
+            file.m_qscore
         ));
     }
 
@@ -142,7 +147,7 @@ fn app() -> Element {
     let mut progress_percentage = use_signal(|| 0.0);
     let mut show_popup = use_signal(|| false);
 
-    let read_files = move |file_engine: Arc<dyn FileEngine>| async move {
+    let read_files = move |file_engine: Arc<dyn dioxus_elements::FileEngine>| async move {
         let files = file_engine.files();
         for file in &files {
             let mut nreads: u64 = 0;
@@ -151,6 +156,7 @@ fn app() -> Element {
             let mut qual20: i64 = 0;
             let mut qual30: i64 = 0;
             let mut len_vector: Vec<i64> = Vec::new();
+            let mut q_vector: Vec<u8> = Vec::new();
 
             if let Some(bytes) = file_engine.read_file(&file).await {
                 let filepath = Path::new(&file);
@@ -165,8 +171,10 @@ fn app() -> Element {
                     qual20 += modules::get_qual_bases(rec.qual(), 53); // 33 offset
                     qual30 += modules::get_qual_bases(rec.qual(), 63); // 33 offset
                     len_vector.push(rec.seq().len() as i64);
+                    q_vector.push(modules::qscore_mean(rec.qual()));
                 }
                 let n50 = modules::get_nx(&mut len_vector, 0.5);
+                let median_qscore = modules::median(&mut q_vector);
 
                 files_uploaded.write().push(UploadedFile {
                     name: file.clone(),
@@ -177,6 +185,7 @@ fn app() -> Element {
                     q30: format!("{:.2}", qual30 as f64 / nbases as f64 * 100.0),
                     nx: n50 as u64,
                     gc: format!("{:.2}", gcbases as f64 / nbases as f64 * 100.0),
+                    m_qscore: median_qscore,
                 });
 
                 progress_percentage.set((files_uploaded.len() as f64 / *files_count.read() as f64) * 100.0);
@@ -297,6 +306,7 @@ fn app() -> Element {
                     th {"GC%"}
                     th {"Q20%"}
                     th {"Q30%"}
+                    th {"Median Qscore"}
                 }
                 }
                 tbody {

@@ -169,6 +169,6 @@ select.usercontrols {
 /* The progress bar itself */
 .progress-bar {
     height: 100%; /* Full height of the container */
-    background-color: #2E86C1; /* Blue color for progress */
+    background-color: #c1692e; 
     transition: width 0.1s ease; /* Smooth transition for width changes */
 }

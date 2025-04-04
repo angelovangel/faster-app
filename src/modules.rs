@@ -40,3 +40,32 @@ pub fn get_gc_bases(seq: &[u8]) -> u64 {
     }
     n
 }
+
+// to get mean of q scores from a record - first convert to prob, calc mean, then back to phred
+// this fn reads phred and converts to probs and returns their sum
+//
+pub fn qscore_mean(q: &[u8]) -> u8 {
+    let mut qprob_sum = 0.0;
+    let mut len = 0;
+    for &item in q {
+        len += 1;
+        let phred = *&item as f32 - 33.0;
+        let prob = 10.0_f32.powf(-phred / 10.0);
+        qprob_sum += prob
+    }
+    let mean_prob = qprob_sum / len as f32;
+    
+    (-10.0 * mean_prob.log10()) as u8    
+}
+
+pub fn median(numbers: &mut Vec<u8>) -> u8 {
+    numbers.sort_unstable();
+
+    let mid = numbers.len() / 2;
+    if numbers.len() % 2 == 0 {
+        return (numbers[mid - 1] + numbers[mid]) / 2
+    } else {
+        return numbers[mid]
+    }
+}
+
