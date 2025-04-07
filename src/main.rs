@@ -90,6 +90,7 @@ fn maketable(
             }
         }
         tr {
+            class: "total-row",
             td {"Total ({entries.len()} files)"}
             if numbers_type == "comma" {
                 td {"{HumanCount(treads())}"}
@@ -101,6 +102,11 @@ fn maketable(
                 td {"{treads()}"}
                 td {"{tbases()}"}
             }
+            td {  }
+            td {  }
+            td {  }
+            td {  }
+            td {  }
         }
     }
 }
