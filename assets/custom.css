@@ -52,6 +52,12 @@ p {
     text-align: center;
     font-size: 1.5rem;
     font-weight: 600;
+    transition: transform 0.2s ease;
+}
+
+#title:hover {
+    color: #1b5e8c;
+    transform: translateY(-2px);
 }
 
 *, *:before, *:after {
@@ -74,27 +80,25 @@ th {
     font-size: 0.9rem;
     font-weight: 400;
     padding: 0.75em 1em;
-    text-align: left;
+    text-align: right;
     cursor: pointer; /* Add this line to change the cursor on hover */
-    transition: background-color 0.3s ease;
+    user-select: none; /* Prevent text selection */
+    transition: background-color 0.2s ease;
 }
 
 th.sortable-header {
     cursor: pointer;
     position: relative;
+    user-select: none;
 }
 
-
-th.sortable-header.active {
-    color: red; /* Make the active sort arrow red */
-}
 
 td {
     color: #555;
     font-weight: 400;
     font-size: 0.9rem;
     padding: 0.75em 1em;
-    text-align: left;
+    text-align: right;
 }
 
 tr.total-row {
@@ -111,7 +115,7 @@ tr.total-row td {
 }
 
 tbody tr {
-    transition: background 0.3s ease;
+    transition: background 0.2s ease;
 }
 
 tbody tr:hover {
@@ -148,7 +152,7 @@ select.usercontrols {
     background-color: #fff;
     color: #333;
     outline: none;
-    transition: border-color 0.3s ease;
+    transition: border-color 0.2s ease;
 }
 
 select.usercontrols:focus {
@@ -182,5 +186,5 @@ select.usercontrols:focus {
 .progress-bar {
     height: 100%;
     background-color: #2E86C1;
-    transition: width 0.3s ease;
+    transition: width 0.2s ease;
 }

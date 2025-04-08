@@ -161,6 +161,18 @@ fn copy_to_clipboard(
     clipboard.set_text(csv_data).unwrap();
 }
 
+fn format_thead(sortby: Signal<(String, bool)>, sortcol: &str) -> String {
+    if sortby.read().0 == sortcol {
+        if sortby.read().1 {
+            "↑".to_string()
+        } else {
+            "↓".to_string()
+        }
+    } else {
+        "↕".to_string()
+    }
+}
+
 fn app() -> Element {
     //let mut enable_directory_upload = use_signal(|| false);
     let mut numbers = use_signal(|| String::new());
@@ -338,15 +350,16 @@ fn app() -> Element {
                                 move |_| sort_by.set(("name".to_string(), !current_sort))
                             },
                             "File ",
-                            if sort_by.read().0 == "name" {
-                                if sort_by.read().1 {
-                                    "↑" // Ascending
-                                } else {
-                                    "↓" // Descending
-                                }
-                            } else {
-                                "↕" // Default indicator for unsorted columns
-                            }
+                            {format_thead(sort_by, "name")}
+                            // if sort_by.read().0 == "name" {
+                            //     if sort_by.read().1 {
+                            //         "↑" // Ascending
+                            //     } else {
+                            //         "↓" // Descending
+                            //     }
+                            // } else {
+                            //     "↕" // Default indicator for unsorted columns
+                            // }
                         }
                         th {
                             class: "sortable-header",
@@ -355,15 +368,7 @@ fn app() -> Element {
                                 move |_| sort_by.set(("reads".to_string(), !current_sort))
                             },
                             "Reads ",
-                            if sort_by.read().0 == "reads" {
-                                if sort_by.read().1 {
-                                    "↑"
-                                } else {
-                                    "↓"
-                                }
-                            } else {
-                                "↕"
-                            }
+                            {format_thead(sort_by, "reads")}
                         }
                         th {
                             class: "sortable-header",
@@ -372,15 +377,7 @@ fn app() -> Element {
                                 move |_| sort_by.set(("bases".to_string(), !current_sort))
                             },
                             "Bases ",
-                            if sort_by.read().0 == "bases" {
-                                if sort_by.read().1 {
-                                    "↑"
-                                } else {
-                                    "↓"
-                                }
-                            } else {
-                                "↕"
-                            }
+                            {format_thead(sort_by, "bases")}
                         }
                         th {
                             class: "sortable-header",
@@ -389,15 +386,7 @@ fn app() -> Element {
                                 move |_| sort_by.set(("nx".to_string(), !current_sort))
                             },
                             "N50 ",
-                            if sort_by.read().0 == "nx" {
-                                if sort_by.read().1 {
-                                    "↑"
-                                } else {
-                                    "↓"
-                                }
-                            } else {
-                                "↕"
-                            }
+                            {format_thead(sort_by, "nx")}
                         }
                         th {
                             class: "sortable-header",
@@ -406,15 +395,7 @@ fn app() -> Element {
                                 move |_| sort_by.set(("gc".to_string(), !current_sort))
                             },
                             "GC% ",
-                            if sort_by.read().0 == "gc" {
-                                if sort_by.read().1 {
-                                    "↑"
-                                } else {
-                                    "↓"
-                                }
-                            } else {
-                                "↕"
-                            }
+                            {format_thead(sort_by, "gc")}
                         }
                         th {
                             class: "sortable-header",
@@ -423,15 +404,7 @@ fn app() -> Element {
                                 move |_| sort_by.set(("q20".to_string(), !current_sort))
                             },
                             "Q20% ",
-                            if sort_by.read().0 == "q20" {
-                                if sort_by.read().1 {
-                                    "↑"
-                                } else {
-                                    "↓"
-                                }
-                            } else {
-                                "↕"
-                            }
+                            {format_thead(sort_by, "q20")}
                         }
                         th {
                             class: "sortable-header",
@@ -440,15 +413,7 @@ fn app() -> Element {
                                 move |_| sort_by.set(("q30".to_string(), !current_sort))
                             },
                             "Q30% ",
-                            if sort_by.read().0 == "q30" {
-                                if sort_by.read().1 {
-                                    "↑"
-                                } else {
-                                    "↓"
-                                }
-                            } else {
-                                "↕"
-                            }
+                            {format_thead(sort_by, "q30")}
                         }
                         th {
                             class: "sortable-header",
@@ -457,15 +422,7 @@ fn app() -> Element {
                                 move |_| sort_by.set(("m_qscore".to_string(), !current_sort))
                             },
                             "Median Qscore ",
-                            if sort_by.read().0 == "m_qscore" {
-                                if sort_by.read().1 {
-                                    "↑"
-                                } else {
-                                    "↓"
-                                }
-                            } else {
-                                "↕"
-                            }
+                            {format_thead(sort_by, "m_qscore")}
                         }
                     }
                 }
