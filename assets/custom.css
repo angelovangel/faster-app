@@ -71,10 +71,22 @@ table {
 th {
     border-bottom: 2px solid #2E86C1;
     color: #2E86C1;
-    font-size: 1rem;
-    font-weight: 600;
+    font-size: 0.9rem;
+    font-weight: 400;
     padding: 0.75em 1em;
     text-align: left;
+    cursor: pointer; /* Add this line to change the cursor on hover */
+    transition: background-color 0.3s ease;
+}
+
+th.sortable-header {
+    cursor: pointer;
+    position: relative;
+}
+
+
+th.sortable-header.active {
+    color: red; /* Make the active sort arrow red */
 }
 
 td {

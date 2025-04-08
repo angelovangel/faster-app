@@ -32,6 +32,7 @@ fn main() {
         .with_cfg(config)
         .launch(app)
 }
+#[derive(Clone)]
 struct UploadedFile {
     name: String,
     basename: String,
@@ -61,32 +62,56 @@ fn maketable(
     numbers_type: String,
     treads: Signal<u64>,
     tbases: Signal<u64>,
+    sort_by: Signal<(String, bool)>, // Track column and sort direction
 ) -> Element {
+    let mut sorted_entries = entries.read().clone();
+
+    // Sort entries based on the current column and direction
+    let (column, ascending) = sort_by.read().clone();
+    sorted_entries.sort_by(|a, b| {
+        let order = match column.as_str() {
+            "name" => a.name.cmp(&b.name),
+            "reads" => a.reads.cmp(&b.reads),
+            "bases" => a.bases.cmp(&b.bases),
+            "nx" => a.nx.cmp(&b.nx),
+            "gc" => a.gc.cmp(&b.gc),
+            "q20" => a.q20.cmp(&b.q20),
+            "q30" => a.q30.cmp(&b.q30),
+            "m_qscore" => a.m_qscore.cmp(&b.m_qscore),
+            _ => std::cmp::Ordering::Equal,
+        };
+        if ascending {
+            order
+        } else {
+            order.reverse()
+        }
+    });
+
     rsx! {
-        for f in entries.read().iter() {
+        for f in sorted_entries.iter() {
             tr {
-            if name_type == "fullpath" {
-                td {"{f.name}"}
-            } else {
-                td {"{f.basename}"}
-            }
-            if numbers_type =="comma" {
-                td {"{HumanCount(f.reads)}"}
-                td {"{HumanCount(f.bases)}"}
-                td {"{HumanCount(f.nx)}"}
-            } else if numbers_type == "human" {
-                td {"{f.reads.human_count_bare()}"}
-                td {"{f.bases.human_count_bare()}"}
-                td {"{f.nx.human_count_bare()}"}
-            } else {
-                td {"{f.reads}"}
-                td {"{f.bases}"}
-                td {"{f.nx}"}
-            }
-            td {"{f.gc}"}
-            td {"{f.q20}"}
-            td {"{f.q30}"}
-            td {"{f.m_qscore}"}
+                if name_type == "fullpath" {
+                    td {"{f.name}"}
+                } else {
+                    td {"{f.basename}"}
+                }
+                if numbers_type == "comma" {
+                    td {"{HumanCount(f.reads)}"}
+                    td {"{HumanCount(f.bases)}"}
+                    td {"{HumanCount(f.nx)}"}
+                } else if numbers_type == "human" {
+                    td {"{f.reads.human_count_bare()}"}
+                    td {"{f.bases.human_count_bare()}"}
+                    td {"{f.nx.human_count_bare()}"}
+                } else {
+                    td {"{f.reads}"}
+                    td {"{f.bases}"}
+                    td {"{f.nx}"}
+                }
+                td {"{f.gc}"}
+                td {"{f.q20}"}
+                td {"{f.q30}"}
+                td {"{f.m_qscore}"}
             }
         }
         tr {
@@ -152,6 +177,7 @@ fn app() -> Element {
     let mut myduration = use_signal(|| String::new());
     let mut progress_percentage = use_signal(|| 0.0);
     let mut show_popup = use_signal(|| false);
+    let mut sort_by = use_signal(|| ("name".to_string(), true)); // Default sort by name ascending
 
     let read_files = move |file_engine: Arc<dyn dioxus_elements::FileEngine>| async move {
         let files = file_engine.files();
@@ -304,19 +330,147 @@ fn app() -> Element {
             table {
                 id: "resultstable",
                 thead {
-                tr {
-                    th {"File"}
-                    th {"Reads"}
-                    th {"Bases"}
-                    th {"N50"}
-                    th {"GC%"}
-                    th {"Q20%"}
-                    th {"Q30%"}
-                    th {"Median Qscore"}
-                }
+                    tr {
+                        th {
+                            class: "sortable-header",
+                            onclick: {
+                                let current_sort = sort_by.read().1;
+                                move |_| sort_by.set(("name".to_string(), !current_sort))
+                            },
+                            "File ",
+                            if sort_by.read().0 == "name" {
+                                if sort_by.read().1 {
+                                    "↑" // Ascending
+                                } else {
+                                    "↓" // Descending
+                                }
+                            } else {
+                                "↕" // Default indicator for unsorted columns
+                            }
+                        }
+                        th {
+                            class: "sortable-header",
+                            onclick: {
+                                let current_sort = sort_by.read().1;
+                                move |_| sort_by.set(("reads".to_string(), !current_sort))
+                            },
+                            "Reads ",
+                            if sort_by.read().0 == "reads" {
+                                if sort_by.read().1 {
+                                    "↑"
+                                } else {
+                                    "↓"
+                                }
+                            } else {
+                                "↕"
+                            }
+                        }
+                        th {
+                            class: "sortable-header",
+                            onclick: {
+                                let current_sort = sort_by.read().1;
+                                move |_| sort_by.set(("bases".to_string(), !current_sort))
+                            },
+                            "Bases ",
+                            if sort_by.read().0 == "bases" {
+                                if sort_by.read().1 {
+                                    "↑"
+                                } else {
+                                    "↓"
+                                }
+                            } else {
+                                "↕"
+                            }
+                        }
+                        th {
+                            class: "sortable-header",
+                            onclick: {
+                                let current_sort = sort_by.read().1;
+                                move |_| sort_by.set(("nx".to_string(), !current_sort))
+                            },
+                            "N50 ",
+                            if sort_by.read().0 == "nx" {
+                                if sort_by.read().1 {
+                                    "↑"
+                                } else {
+                                    "↓"
+                                }
+                            } else {
+                                "↕"
+                            }
+                        }
+                        th {
+                            class: "sortable-header",
+                            onclick: {
+                                let current_sort = sort_by.read().1;
+                                move |_| sort_by.set(("gc".to_string(), !current_sort))
+                            },
+                            "GC% ",
+                            if sort_by.read().0 == "gc" {
+                                if sort_by.read().1 {
+                                    "↑"
+                                } else {
+                                    "↓"
+                                }
+                            } else {
+                                "↕"
+                            }
+                        }
+                        th {
+                            class: "sortable-header",
+                            onclick: {
+                                let current_sort = sort_by.read().1;
+                                move |_| sort_by.set(("q20".to_string(), !current_sort))
+                            },
+                            "Q20% ",
+                            if sort_by.read().0 == "q20" {
+                                if sort_by.read().1 {
+                                    "↑"
+                                } else {
+                                    "↓"
+                                }
+                            } else {
+                                "↕"
+                            }
+                        }
+                        th {
+                            class: "sortable-header",
+                            onclick: {
+                                let current_sort = sort_by.read().1;
+                                move |_| sort_by.set(("q30".to_string(), !current_sort))
+                            },
+                            "Q30% ",
+                            if sort_by.read().0 == "q30" {
+                                if sort_by.read().1 {
+                                    "↑"
+                                } else {
+                                    "↓"
+                                }
+                            } else {
+                                "↕"
+                            }
+                        }
+                        th {
+                            class: "sortable-header",
+                            onclick: {
+                                let current_sort = sort_by.read().1;
+                                move |_| sort_by.set(("m_qscore".to_string(), !current_sort))
+                            },
+                            "Median Qscore ",
+                            if sort_by.read().0 == "m_qscore" {
+                                if sort_by.read().1 {
+                                    "↑"
+                                } else {
+                                    "↓"
+                                }
+                            } else {
+                                "↕"
+                            }
+                        }
+                    }
                 }
                 tbody {
-                    {maketable(files_uploaded, name_type_sig(), numbers(), total_reads, total_bases)}
+                    {maketable(files_uploaded, name_type_sig(), numbers(), total_reads, total_bases, sort_by)}
                 }
             }
         }
