@@ -136,14 +136,13 @@ fn maketable(
     }
 }
 
-fn copy_to_clipboard(
-    f_uploaded: Signal<Vec<UploadedFile>>
-    //mut show_popup: Signal<bool>
-    ) {
+fn copy_to_clipboard(f_uploaded: Signal<Vec<UploadedFile>>) {
     let mut csv_data = String::new();
+    csv_data.push_str("File,Reads,Bases,N50,GC%,Q20%,Q30%,Median_Qscore\n");
+
     for file in f_uploaded.read().iter() {
         csv_data.push_str(&format!(
-            "{},{},{},{},{},{},{}.{}\n",
+            "{},{},{},{},{},{},{},{}\n",
             //file.name,
             file.basename,
             file.reads,
