@@ -194,7 +194,9 @@ fn generate_histogram(q_vector: &[u8]) -> String {
         .map(|(i, &count)| {
             let height = (count as f64 / max_count as f64) * 100.0; // Normalize height to a percentage
             format!(
-                r#"<div class="bar" style="height: {height}%" data-tooltip="Q {range_start}-{range_end}: {count}"></div>"#,
+                r#"<div class="bar" style="height: {height}%;">
+                    <div class="tooltip">Q {range_start}-{range_end}: {count}</div>
+                </div>"#,
                 height = height,
                 range_start = i * 2,
                 range_end = i * 2 + 2,
@@ -454,7 +456,7 @@ fn app() -> Element {
                                 let current_sort = sort_by.read().1;
                                 move |_| sort_by.set(("m_qscore".to_string(), !current_sort))
                             },
-                            "Median Qscore ",
+                            "Qscore histogram",
                             {format_thead(sort_by, "m_qscore")}
                         }
                     }

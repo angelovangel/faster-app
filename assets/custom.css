@@ -216,7 +216,7 @@ td.histogram-cell, th.histogram-cell {
     width: calc(100% / 30 - 1px); /* Adjust width to account for the border */
     background-color: #2E86C1; /* Default bar color */
     border: 1px solid transparent; /* Add a small border between bins */
-    position: relative; /* Required for tooltip positioning */
+    /*position: relative; /* Required for tooltip positioning */
     cursor: pointer; /* Indicate interactivity */
     transition: background-color 0.3s ease, height 0.3s ease; /* Smooth transitions */
 }
@@ -233,14 +233,14 @@ td.histogram-cell, th.histogram-cell {
     background-color: #1b5e8c; /* Highlight color on hover */
 }
 
-.histogram-cell .bar::after {
-    content: attr(data-tooltip); /* Use the data-tooltip attribute for content */
+.histogram-cell .tooltip {
+    /*content: attr(data-tooltip); /* Use the data-tooltip attribute for content */
     position: absolute;
     /*bottom: 100%; /* Position above the bar */
-    top: -5px;
+    top: -20px; /* Position above the bar */
     left: 50%;
     transform: translateX(-50%);
-    background-color: #333; /* Tooltip background color */
+    background-color: #1b5e8c; /* Tooltip background color */
     color: #fff; /* Tooltip text color */
     padding: 5px 8px;
     border-radius: 4px;
@@ -252,6 +252,6 @@ td.histogram-cell, th.histogram-cell {
     transition: opacity 0.2s ease; /* Smooth fade-in effect */
 }
 
-.histogram-cell .bar:hover::after {
+.histogram-cell .bar:hover .tooltip {
     opacity: 1; /* Show the tooltip on hover */
 }
