@@ -97,7 +97,7 @@ td {
     color: #555;
     font-weight: 400;
     font-size: 0.9rem;
-    padding: 0.75em 1em;
+    padding: 0.5em 0.5em;
     text-align: right;
 }
 
@@ -114,13 +114,13 @@ tr.total-row td {
   font-weight: bold;
 }
 
-tbody tr {
+/* tbody tr {
     transition: background 0.2s ease;
 }
 
 tbody tr:hover {
     background: #f1f8ff;
-}
+} */
 
 .usercontrols {
     cursor: pointer;
@@ -187,4 +187,71 @@ select.usercontrols:focus {
     height: 100%;
     background-color: #2E86C1;
     transition: width 0.2s ease;
+}
+
+td, th {
+    vertical-align: bottom; /* Align content to the bottom of the cell */
+}
+
+td.histogram-cell, th.histogram-cell {
+    width: 250px; /* Set a fixed width for the histogram column */
+    max-width: 2500px; /* Ensure the column doesn't grow beyond this width */
+    vertical-align: bottom;
+    padding: 0.5em 0.5em;
+}
+
+.histogram-cell {
+    display: flex;
+    align-items: flex-end; /* Align bars to the bottom */
+    justify-content: space-between; /* Space bars evenly */
+    height: 50px; /* Set a fixed height for the histogram */
+    /*background-color: #f9f9f9; /* Light background for contrast */
+    /*border: 1px solid #ddd; /* Add a border around the histogram */
+    padding: 0.5px;
+    box-sizing: border-box;
+    position: relative;
+}
+
+.histogram-cell .bar {
+    width: calc(100% / 30 - 1px); /* Adjust width to account for the border */
+    background-color: #2E86C1; /* Default bar color */
+    border: 1px solid transparent; /* Add a small border between bins */
+    position: relative; /* Required for tooltip positioning */
+    cursor: pointer; /* Indicate interactivity */
+    transition: background-color 0.3s ease, height 0.3s ease; /* Smooth transitions */
+}
+
+.histogram-cell .bar:hover {
+    background-color: #1b5e8c; /* Highlight color on hover */
+}
+
+.histogram-cell .bar:nth-child(5n) {
+    background-color:#f37736; /* Set the 10th bar to red */
+}
+
+.histogram-cell .bar:hover {
+    background-color: #1b5e8c; /* Highlight color on hover */
+}
+
+.histogram-cell .bar::after {
+    content: attr(data-tooltip); /* Use the data-tooltip attribute for content */
+    position: absolute;
+    /*bottom: 100%; /* Position above the bar */
+    top: -5px;
+    left: 50%;
+    transform: translateX(-50%);
+    background-color: #333; /* Tooltip background color */
+    color: #fff; /* Tooltip text color */
+    padding: 5px 8px;
+    border-radius: 4px;
+    font-size: 0.8rem;
+    white-space: nowrap; /* Prevent text wrapping */
+    z-index: 10;
+    opacity: 0; /* Initially hidden */
+    pointer-events: none; /* Prevent interaction with the tooltip */
+    transition: opacity 0.2s ease; /* Smooth fade-in effect */
+}
+
+.histogram-cell .bar:hover::after {
+    opacity: 1; /* Show the tooltip on hover */
 }

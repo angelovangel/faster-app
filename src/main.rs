@@ -42,7 +42,8 @@ struct UploadedFile {
     gc: String,
     q20: String,
     q30: String,
-    m_qscore: u8
+    m_qscore: u8,
+    q_vector: Vec<u8>, // Add this field to store the quality scores
 }
 
 async fn decode_reader(bytes: Vec<u8>, filename: &String) -> io::Result<Box<dyn io::Read + Send>> {
@@ -111,7 +112,10 @@ fn maketable(
                 td {"{f.gc}"}
                 td {"{f.q20}"}
                 td {"{f.q30}"}
-                td {"{f.m_qscore}"}
+                td {
+                    class: "histogram-cell",
+                    dangerous_inner_html: "{generate_histogram(&f.q_vector)}" // Render the histogram as HTML
+                }
             }
         }
         tr {
@@ -172,6 +176,35 @@ fn format_thead(sortby: Signal<(String, bool)>, sortcol: &str) -> String {
     }
 }
 
+fn generate_histogram(q_vector: &[u8]) -> String {
+    let mut bins = [0; 30]; // Create 30 bins for the histogram
+    for &q in q_vector {
+        let bin = (q / 2) as usize; // bin spans 2 qvalues e.g. 8-10
+        if bin < bins.len() {
+            bins[bin] += 1;
+        }
+    }
+
+    // Find the maximum count to normalize the bar heights
+    let max_count = *bins.iter().max().unwrap_or(&1);
+
+    // Generate HTML for the bar chart
+    bins.iter()
+        .enumerate()
+        .map(|(i, &count)| {
+            let height = (count as f64 / max_count as f64) * 100.0; // Normalize height to a percentage
+            format!(
+                r#"<div class="bar" style="height: {height}%" data-tooltip="Q {range_start}-{range_end}: {count}"></div>"#,
+                height = height,
+                range_start = i * 2,
+                range_end = i * 2 + 2,
+                count = count
+            )
+        })
+        .collect::<Vec<_>>()
+        .join("") // Combine all bars into a single string
+}
+
 fn app() -> Element {
     //let mut enable_directory_upload = use_signal(|| false);
     let mut numbers = use_signal(|| String::new());
@@ -229,6 +262,7 @@ fn app() -> Element {
                     nx: n50 as u64,
                     gc: format!("{:.2}", gcbases as f64 / nbases as f64 * 100.0),
                     m_qscore: median_qscore,
+                    q_vector: q_vector.clone(),
                 });
 
                 progress_percentage.set((files_uploaded.len() as f64 / *files_count.read() as f64) * 100.0);
