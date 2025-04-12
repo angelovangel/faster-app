@@ -1,6 +1,6 @@
 [package]
 name = "fasterx"
-version = "0.2.3"
+version = "0.2.4"
 authors = ["angelovangel <aangeloo@gmail.com>"]
 edition = "2021"
 

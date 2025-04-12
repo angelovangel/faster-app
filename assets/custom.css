@@ -1,4 +1,5 @@
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Roboto+Mono:wght@400;500;700&display=swap');
 
 body {
     font-family: 'Inter', sans-serif;
@@ -67,6 +68,7 @@ p {
 }
 
 table {
+    width: 100%;
     background: #fff;
     border-radius: 8px;
     border-collapse: collapse;
@@ -99,6 +101,7 @@ td {
     font-size: 0.9rem;
     padding: 0.5em 0.5em;
     text-align: right;
+    font-family: 'Roboto Mono', monospace; /* Apply the monospace font to table cells */
 }
 
 tr.total-row {
