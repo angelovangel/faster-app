@@ -195,12 +195,12 @@ fn generate_histogram(q_vector: &[u8]) -> String {
             let height = (count as f64 / max_count as f64) * 100.0; // Normalize height to a percentage
             format!(
                 r#"<div class="bar" style="height: {height}%;">
-                    <div class="tooltip">Q {range_start}-{range_end}: {count}</div>
+                    <div class="tooltip">Q {range_start}-{range_end}: {count} reads</div>
                 </div>"#,
                 height = height,
                 range_start = i * 2,
                 range_end = i * 2 + 2,
-                count = count
+                count = count.human_count_bare()
             )
         })
         .collect::<Vec<_>>()
@@ -465,6 +465,12 @@ fn app() -> Element {
                     {maketable(files_uploaded, name_type_sig(), numbers(), total_reads, total_bases, sort_by)}
                 }
             }
+        }
+
+        // Footer with app version info
+        footer {
+            class: "app-footer",
+            "fasterX app - v0.2.4 © 2025"
         }
 
         if *busy.read() {

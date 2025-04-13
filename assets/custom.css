@@ -143,10 +143,13 @@ tbody tr:hover {
 
 .usercontrols:hover {
     background-color: #1b5e8c;
+    color: #fff;
     transform: translateY(-2px);
 }
 
 select.usercontrols {
+    font-family: 'Inter', sans-serif; /* Ensure the font matches your body font */
+    font-size: 1rem; /* Adjust font size */
     height: 40px;
     padding: 8px;
     font-size: 1rem;
@@ -154,12 +157,18 @@ select.usercontrols {
     border-radius: 4px;
     background-color: #fff;
     color: #333;
+    appearance: none; /* Remove default browser styling */
     outline: none;
-    transition: border-color 0.2s ease;
+    transition: background-color 0.3s ease, transform 0.2s ease;
 }
 
-select.usercontrols:focus {
-    border-color: #2E86C1;
+/* Apply font styles to the options inside the dropdown */
+select.usercontrols option {
+    font-family: 'Inter', sans-serif; /* Ensure the font is applied to options */
+    font-size: 1rem; /* Match the font size of the select element */
+    background-color: #1b5e8c;
+    color: #fff;
+    appearance: none; /* Remove default browser styling */
 }
 
 .popup {
@@ -257,4 +266,17 @@ td.histogram-cell, th.histogram-cell {
 
 .histogram-cell .bar:hover .tooltip {
     opacity: 1; /* Show the tooltip on hover */
+}
+
+.app-footer {
+    width: 100%;
+    text-align: right;
+    padding: 10px 10px;
+    background-color: #f9f9f9; /* Light background for contrast */
+    color: #555; /* Text color */
+    font-size: 0.8rem; /* Slightly smaller font size */
+    border-top: 1px solid #ddd; /* Add a subtle border at the top */
+    position: fixed; /* Keep the footer at the bottom of the page */
+    bottom: 0;
+    left: 0;
 }
