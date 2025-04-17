@@ -70,7 +70,7 @@ p {
 table {
     width: 100%;
     background: #fff;
-    border-radius: 8px;
+    border-radius: 1px;
     border-collapse: collapse;
     margin: 1em;
     box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
@@ -206,8 +206,8 @@ td, th {
 }
 
 td.histogram-cell, th.histogram-cell {
-    width: 250px; /* Set a fixed width for the histogram column */
-    max-width: 2500px; /* Ensure the column doesn't grow beyond this width */
+    width: 200px; /* Set a fixed width for the histogram column */
+    max-width: 2000px; /* Ensure the column doesn't grow beyond this width */
     vertical-align: bottom;
     padding: 0.5em 0.5em;
 }
@@ -217,6 +217,7 @@ td.histogram-cell, th.histogram-cell {
     align-items: flex-end; /* Align bars to the bottom */
     justify-content: space-between; /* Space bars evenly */
     height: 50px; /* Set a fixed height for the histogram */
+    /*overflow: hidden; */
     /*background-color: #f9f9f9; /* Light background for contrast */
     /*border: 1px solid #ddd; /* Add a border around the histogram */
     padding: 0.5px;

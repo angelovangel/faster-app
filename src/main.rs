@@ -39,10 +39,11 @@ struct UploadedFile {
     reads: u64,
     bases: u64,
     nx: u64,
+    l_vector: Vec<i64>,
     gc: String,
     q20: String,
     q30: String,
-    m_qscore: u8,
+    m_qscore: u8, // median q score
     q_vector: Vec<u8>, // Add this field to store the quality scores
 }
 
@@ -109,12 +110,16 @@ fn maketable(
                     td {"{f.bases}"}
                     td {"{f.nx}"}
                 }
+                td {
+                    class: "histogram-cell",
+                    dangerous_inner_html: "{generate_l_histogram(&f.l_vector)}"
+                }
                 td {"{f.gc}"}
-                td {"{f.q20}"}
+                //td {"{f.q20}"}
                 td {"{f.q30}"}
                 td {
                     class: "histogram-cell",
-                    dangerous_inner_html: "{generate_histogram(&f.q_vector)}" // Render the histogram as HTML
+                    dangerous_inner_html: "{generate_q_histogram(&f.q_vector)}" // Render the histogram as HTML
                 }
             }
         }
@@ -176,7 +181,7 @@ fn format_thead(sortby: Signal<(String, bool)>, sortcol: &str) -> String {
     }
 }
 
-fn generate_histogram(q_vector: &[u8]) -> String {
+fn generate_q_histogram(q_vector: &[u8]) -> String {
     let mut bins = [0; 30]; // Create 30 bins for the histogram
     for &q in q_vector {
         let bin = (q / 2) as usize; // bin spans 2 qvalues e.g. 8-10
@@ -200,6 +205,37 @@ fn generate_histogram(q_vector: &[u8]) -> String {
                 height = height,
                 range_start = i * 2,
                 range_end = i * 2 + 2,
+                count = count.human_count_bare()
+            )
+        })
+        .collect::<Vec<_>>()
+        .join("") // Combine all bars into a single string
+}
+
+fn generate_l_histogram(l_vector: &[i64]) -> String {
+    let mut bins = [0; 30]; // Create 30 bins for the histogram
+    for &l in l_vector {
+        let bin = (l / 1666) as usize; // 1 bin spans 1666 bp
+        if bin < bins.len() {
+            bins[bin] += 1;
+        }
+    }
+
+    // Find the maximum count to normalize the bar heights
+    let max_count = *bins.iter().max().unwrap_or(&1);
+
+    // Generate HTML for the bar chart
+    bins.iter()
+        .enumerate()
+        .map(|(i, &count)| {
+            let height = (count as f64 / max_count as f64) * 100.0; // Normalize height to a percentage
+            format!(
+                r#"<div class="bar" style="height: {height}%;">
+                    <div class="tooltip">Length {range_start}-{range_end}: {count} reads</div>
+                </div>"#,
+                height = height,
+                range_start = i * 1666,
+                range_end = i * 1666 + 1666,
                 count = count.human_count_bare()
             )
         })
@@ -234,7 +270,7 @@ fn app() -> Element {
             let mut qual20: i64 = 0;
             let mut qual30: i64 = 0;
             let mut len_vector: Vec<i64> = Vec::new();
-            let mut q_vector: Vec<u8> = Vec::new();
+            let mut qual_vector: Vec<u8> = Vec::new();
 
             if let Some(bytes) = file_engine.read_file(&file).await {
                 let filepath = Path::new(&file);
@@ -249,10 +285,10 @@ fn app() -> Element {
                     qual20 += modules::get_qual_bases(rec.qual(), 53); // 33 offset
                     qual30 += modules::get_qual_bases(rec.qual(), 63); // 33 offset
                     len_vector.push(rec.seq().len() as i64);
-                    q_vector.push(modules::qscore_mean(rec.qual()));
+                    qual_vector.push(modules::qscore_mean(rec.qual()));
                 }
                 let n50 = modules::get_nx(&mut len_vector, 0.5);
-                let median_qscore = modules::median(&mut q_vector);
+                let median_qscore = modules::median(&mut qual_vector);
 
                 files_uploaded.write().push(UploadedFile {
                     name: file.clone(),
@@ -264,7 +300,8 @@ fn app() -> Element {
                     nx: n50 as u64,
                     gc: format!("{:.2}", gcbases as f64 / nbases as f64 * 100.0),
                     m_qscore: median_qscore,
-                    q_vector: q_vector.clone(),
+                    q_vector: qual_vector.clone(),
+                    l_vector: len_vector.clone(),
                 });
 
                 progress_percentage.set((files_uploaded.len() as f64 / *files_count.read() as f64) * 100.0);
@@ -427,20 +464,29 @@ fn app() -> Element {
                             class: "sortable-header",
                             onclick: {
                                 let current_sort = sort_by.read().1;
-                                move |_| sort_by.set(("gc".to_string(), !current_sort))
+                                move |_| sort_by.set(("nx".to_string(), !current_sort))
                             },
-                            "GC% ",
-                            {format_thead(sort_by, "gc")}
+                            "Length histogram",
+                            {format_thead(sort_by, "nx")}
                         }
                         th {
                             class: "sortable-header",
                             onclick: {
                                 let current_sort = sort_by.read().1;
-                                move |_| sort_by.set(("q20".to_string(), !current_sort))
+                                move |_| sort_by.set(("gc".to_string(), !current_sort))
                             },
-                            "Q20% ",
-                            {format_thead(sort_by, "q20")}
+                            "GC% ",
+                            {format_thead(sort_by, "gc")}
                         }
+                        // th {
+                        //     class: "sortable-header",
+                        //     onclick: {
+                        //         let current_sort = sort_by.read().1;
+                        //         move |_| sort_by.set(("q20".to_string(), !current_sort))
+                        //     },
+                        //     "Q20% ",
+                        //     {format_thead(sort_by, "q20")}
+                        // }
                         th {
                             class: "sortable-header",
                             onclick: {
