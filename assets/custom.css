@@ -238,7 +238,7 @@ td.histogram-cell, th.histogram-cell {
     background-color: #1b5e8c; /* Highlight color on hover */
 }
 
-.histogram-cell .bar:nth-child(5n) {
+.histogram-cell .bar:nth-child(10n) {
     background-color:#f37736; /* Set the 10th bar to red */
 }
 

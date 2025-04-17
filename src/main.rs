@@ -62,6 +62,7 @@ fn maketable(
     entries: Signal<Vec<UploadedFile>>,
     name_type: String,
     numbers_type: String,
+    binsize: Signal<usize>,
     treads: Signal<u64>,
     tbases: Signal<u64>,
     sort_by: Signal<(String, bool)>, // Track column and sort direction
@@ -112,7 +113,7 @@ fn maketable(
                 }
                 td {
                     class: "histogram-cell",
-                    dangerous_inner_html: "{generate_l_histogram(&f.l_vector)}"
+                    dangerous_inner_html: "{generate_l_histogram(&f.l_vector, binsize())}"
                 }
                 td {"{f.gc}"}
                 //td {"{f.q20}"}
@@ -212,10 +213,10 @@ fn generate_q_histogram(q_vector: &[u8]) -> String {
         .join("") // Combine all bars into a single string
 }
 
-fn generate_l_histogram(l_vector: &[i64]) -> String {
+fn generate_l_histogram(l_vector: &[i64], binsize: usize) -> String {
     let mut bins = [0; 30]; // Create 30 bins for the histogram
     for &l in l_vector {
-        let bin = (l / 1666) as usize; // 1 bin spans 1666 bp
+        let bin = l as usize/ binsize; // 1 bin spans binsize bp
         if bin < bins.len() {
             bins[bin] += 1;
         }
@@ -234,8 +235,8 @@ fn generate_l_histogram(l_vector: &[i64]) -> String {
                     <div class="tooltip">Length {range_start}-{range_end}: {count} reads</div>
                 </div>"#,
                 height = height,
-                range_start = i * 1666,
-                range_end = i * 1666 + 1666,
+                range_start = i * binsize,
+                range_end = i * binsize + binsize,
                 count = count.human_count_bare()
             )
         })
@@ -246,6 +247,7 @@ fn generate_l_histogram(l_vector: &[i64]) -> String {
 fn app() -> Element {
     //let mut enable_directory_upload = use_signal(|| false);
     let mut numbers = use_signal(|| String::new());
+    let mut basesperbin = use_signal(|| 1000);
     let mut name_type_sig = use_signal(|| String::new());
     let mut files_uploaded = use_signal(|| Vec::new() as Vec<UploadedFile>);
     let mut files_count = use_signal(|| 0);
@@ -407,6 +409,39 @@ fn app() -> Element {
                     option {value: "comma", "Thousands sep"},
                     option {value: "human", "SI suffix"}
                 }
+                
+                input {
+                    r#type: "number",
+                    id: "basesperbin",
+                    title: "Bases per bin for the length histogram",
+                    class: "usercontrols",
+                    value: "{basesperbin}", // Bind the current value of basesperbin
+                    min: "100",
+                    max: "5000",
+                    step: "100", // Set the step size for increment/decrement
+                    oninput: move |ev| {
+                        if let Ok(value) = ev.value().parse::<usize>() {
+                            basesperbin.set(value); // Update the basesperbin signal
+                        }
+                    },
+                }
+
+                // select {
+                //     r#name: "basesperbin", id: "basesperbin",
+                //     class: "usercontrols",
+                //     multiple: false,
+                //     oninput: move |ev| {
+                //         if let Ok(value) = ev.value().parse::<usize>() {
+                //             basesperbin.set(value);
+                //         }
+                //     },
+                //     option { value: "100", "100" }
+                //     option { value: "500", "500" }
+                //     option { value: "1000", "1000" }
+                //     option { value: "2000", "2000" }
+                //     option { value: "3000", "3000" }
+                //     option { value: "5000", "5000" }
+                // }
             }
         }
 
@@ -461,13 +496,13 @@ fn app() -> Element {
                             {format_thead(sort_by, "nx")}
                         }
                         th {
-                            class: "sortable-header",
-                            onclick: {
-                                let current_sort = sort_by.read().1;
-                                move |_| sort_by.set(("nx".to_string(), !current_sort))
-                            },
-                            "Length histogram",
-                            {format_thead(sort_by, "nx")}
+                            // class: "sortable-header",
+                            // onclick: {
+                            //     let current_sort = sort_by.read().1;
+                            //     move |_| sort_by.set(("nx".to_string(), !current_sort))
+                            // },
+                            "Length histogram"
+                            //{format_thead(sort_by, "nx")}
                         }
                         th {
                             class: "sortable-header",
@@ -497,18 +532,18 @@ fn app() -> Element {
                             {format_thead(sort_by, "q30")}
                         }
                         th {
-                            class: "sortable-header",
-                            onclick: {
-                                let current_sort = sort_by.read().1;
-                                move |_| sort_by.set(("m_qscore".to_string(), !current_sort))
-                            },
-                            "Qscore histogram",
-                            {format_thead(sort_by, "m_qscore")}
+                            // class: "sortable-header",
+                            // onclick: {
+                            //     let current_sort = sort_by.read().1;
+                            //     move |_| sort_by.set(("m_qscore".to_string(), !current_sort))
+                            // },
+                            "Qscore histogram"
+                            //{format_thead(sort_by, "m_qscore")}
                         }
                     }
                 }
                 tbody {
-                    {maketable(files_uploaded, name_type_sig(), numbers(), total_reads, total_bases, sort_by)}
+                    {maketable(files_uploaded, name_type_sig(), numbers(), basesperbin, total_reads, total_bases, sort_by)}
                 }
             }
         }
