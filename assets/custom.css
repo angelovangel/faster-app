@@ -246,11 +246,11 @@ td.histogram-cell, th.histogram-cell {
     background-color: #1b5e8c; /* Highlight color on hover */
 }
 
-.histogram-cell .tooltip {
+.tooltip {
     /*content: attr(data-tooltip); /* Use the data-tooltip attribute for content */
     position: absolute;
     /*bottom: 100%; /* Position above the bar */
-    top: -20px; /* Position above the bar */
+    top: -35px; /* Position above the bar */
     left: 50%;
     transform: translateX(-50%);
     background-color: #1b5e8c; /* Tooltip background color */
@@ -267,6 +267,16 @@ td.histogram-cell, th.histogram-cell {
 
 .histogram-cell .bar:hover .tooltip {
     opacity: 1; /* Show the tooltip on hover */
+}
+
+.tooltip-container {
+    position: relative;
+    display: inline-block;
+}
+
+.tooltip-container:hover .tooltip {
+    visibility: visible;
+    opacity: 1;
 }
 
 .app-footer {

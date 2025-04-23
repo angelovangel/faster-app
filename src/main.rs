@@ -184,24 +184,30 @@ fn format_thead(sortby: Signal<(String, bool)>, sortcol: &str) -> String {
 
 fn generate_q_histogram(q_vector: &[u8]) -> String {
     let mut bins = [0; 30]; // Create 30 bins for the histogram
+    let max_bin_index = bins.len() - 1; // Index of the last bin
+
     for &q in q_vector {
         let bin = (q / 2) as usize; // bin spans 2 qvalues e.g. 8-10
         if bin < bins.len() {
             bins[bin] += 1;
+        } else {
+            bins[max_bin_index] += 1; // Increment the last bin for out-of-range values
         }
     }
 
     // Find the maximum count to normalize the bar heights
     let max_count = *bins.iter().max().unwrap_or(&1);
+    let sum_count = bins.iter().sum::<u64>();
 
     // Generate HTML for the bar chart
     bins.iter()
         .enumerate()
         .map(|(i, &count)| {
             let height = (count as f64 / max_count as f64) * 100.0; // Normalize height to a percentage
+            let percent = format!("{:.0}", count as f64 / sum_count as f64 * 100.0);
             format!(
                 r#"<div class="bar" style="height: {height}%;">
-                    <div class="tooltip">Q {range_start}-{range_end}: {count} reads</div>
+                    <div class="tooltip">Q {range_start}-{range_end}: {count} reads ({percent} %)</div>
                 </div>"#,
                 height = height,
                 range_start = i * 2,
@@ -215,28 +221,40 @@ fn generate_q_histogram(q_vector: &[u8]) -> String {
 
 fn generate_l_histogram(l_vector: &[i64], binsize: usize) -> String {
     let mut bins = [0; 30]; // Create 30 bins for the histogram
+    let max_bin_index = bins.len() - 1; // Index of the last bin
+    
     for &l in l_vector {
         let bin = l as usize/ binsize; // 1 bin spans binsize bp
         if bin < bins.len() {
             bins[bin] += 1;
+        } else {
+            bins[max_bin_index] += 1; // Increment the last bin for out-of-range values
         }
     }
 
     // Find the maximum count to normalize the bar heights
     let max_count = *bins.iter().max().unwrap_or(&1);
+    let sum_count = bins.iter().sum::<u64>();
 
     // Generate HTML for the bar chart
     bins.iter()
         .enumerate()
         .map(|(i, &count)| {
             let height = (count as f64 / max_count as f64) * 100.0; // Normalize height to a percentage
+            let percent = format!("{:.0}", count as f64 / sum_count as f64 * 100.0);
+            let range_start = i * binsize;
+            let range_end = if i == max_bin_index {
+                format!(">{}", range_start.human_count_bare()) // Use ">range_start" for the last bin
+            } else {
+                format!("{}-{}", range_start.human_count_bare(), (range_start + binsize).human_count_bare())
+            };
+
             format!(
                 r#"<div class="bar" style="height: {height}%;">
-                    <div class="tooltip">Length {range_start}-{range_end}: {count} reads</div>
+                    <div class="tooltip">Length {range_end}: {count} reads ({percent} %) </div>
                 </div>"#,
                 height = height,
-                range_start = i * binsize,
-                range_end = i * binsize + binsize,
+                range_end = range_end,
                 count = count.human_count_bare()
             )
         })
@@ -257,6 +275,7 @@ fn app() -> Element {
     
     let mut busy = use_signal(|| false);
     let mut ready = use_signal(|| false);
+    let mut cancel_processing = use_signal(|| false);
     let mut start_time = use_signal(|| Instant::now());
     let mut myduration = use_signal(|| String::new());
     let mut progress_percentage = use_signal(|| 0.0);
@@ -266,6 +285,10 @@ fn app() -> Element {
     let read_files = move |file_engine: Arc<dyn dioxus_elements::FileEngine>| async move {
         let files = file_engine.files();
         for file in &files {
+            if *cancel_processing.read() {
+                break; // Exit the loop if processing is canceled
+            }
+
             let mut nreads: u64 = 0;
             let mut nbases: u64 = 0;
             let mut gcbases: u64 = 0;
@@ -281,6 +304,9 @@ fn app() -> Element {
                 let mut recs = fastq::Reader::new(reader).records();
 
                 while let Some(Ok(rec)) = recs.next() {
+                    if *cancel_processing.read() {
+                        break; // Exit the loop if processing is canceled
+                    }
                     nreads += 1;
                     gcbases += modules::get_gc_bases(rec.seq());
                     nbases += rec.seq().len() as u64;
@@ -288,6 +314,8 @@ fn app() -> Element {
                     qual30 += modules::get_qual_bases(rec.qual(), 63); // 33 offset
                     len_vector.push(rec.seq().len() as i64);
                     qual_vector.push(modules::qscore_mean(rec.qual()));
+
+                    tokio::task::yield_now().await; // Yield to allow the UI to update
                 }
                 let n50 = modules::get_nx(&mut len_vector, 0.5);
                 let median_qscore = modules::median(&mut qual_vector);
@@ -312,6 +340,11 @@ fn app() -> Element {
                 total_bases += nbases;
                 total_reads += nreads;
             }
+        }
+
+        if *cancel_processing.read() {
+            busy.set(false); // Reset the busy state
+            progress_percentage.set(0.0); // Reset progress
         }
     };
 
@@ -398,50 +431,50 @@ fn app() -> Element {
                 }
 
                 //label {r#for: "numbers", ""}
-                select {
-                    r#name: "numbers", id: "numbers",
-                    class: "usercontrols",
-                    multiple: false,
-                    oninput: move |ev| {
-                        numbers.set(ev.value())
-                    },
-                    option {value: "none", "Plain numeric"},
-                    option {value: "comma", "Thousands sep"},
-                    option {value: "human", "SI suffix"}
+                div {
+                    class: "tooltip-container",
+                    div {
+                        class: "tooltip",
+                        "Choose number format", 
+                    }
+                    select {
+                        r#name: "numbers", id: "numbers",
+                        class: "usercontrols",
+                        multiple: false,
+                        oninput: move |ev| {
+                            numbers.set(ev.value())
+                        },
+                        option {value: "none", "Plain numeric"},
+                        option {value: "comma", "Thousands sep"},
+                        option {value: "human", "SI suffix"}
+                    }
                 }
                 
-                input {
-                    r#type: "number",
-                    id: "basesperbin",
-                    title: "Bases per bin for the length histogram",
-                    class: "usercontrols",
-                    value: "{basesperbin}", // Bind the current value of basesperbin
-                    min: "100",
-                    max: "5000",
-                    step: "100", // Set the step size for increment/decrement
-                    oninput: move |ev| {
-                        if let Ok(value) = ev.value().parse::<usize>() {
-                            basesperbin.set(value); // Update the basesperbin signal
-                        }
-                    },
+                div {
+                    class: "tooltip-container",
+                    div {
+                        class: "tooltip",
+                        "Length histogram: bases per bin", 
+                        br {}, 
+                        "Showing {basesperbin().human_count_bare()}-{(basesperbin * 30).human_count_bare()}", " bp",
+                    }
+                    input {
+                        r#type: "number",
+                        id: "basesperbin",
+                        //title: "Bases per bin for the length histogram",
+                        class: "usercontrols",
+                        value: "{basesperbin}", // Bind the current value of basesperbin
+                        min: "50",
+                        max: "5000",
+                        step: "50", // Set the step size for increment/decrement
+                        oninput: move |ev| {
+                            if let Ok(value) = ev.value().parse::<usize>() {
+                                basesperbin.set(value); // Update the basesperbin signal
+                            }
+                        },
+                    }
                 }
-
-                // select {
-                //     r#name: "basesperbin", id: "basesperbin",
-                //     class: "usercontrols",
-                //     multiple: false,
-                //     oninput: move |ev| {
-                //         if let Ok(value) = ev.value().parse::<usize>() {
-                //             basesperbin.set(value);
-                //         }
-                //     },
-                //     option { value: "100", "100" }
-                //     option { value: "500", "500" }
-                //     option { value: "1000", "1000" }
-                //     option { value: "2000", "2000" }
-                //     option { value: "3000", "3000" }
-                //     option { value: "5000", "5000" }
-                // }
+                
             }
         }
 
@@ -555,6 +588,14 @@ fn app() -> Element {
         }
 
         if *busy.read() {
+            button {
+                class: "usercontrols",
+                onclick: move |_| {
+                    cancel_processing.set(true);
+
+                },
+                "Cancel"
+            }
             div {
                 class: "popup",
                 "Please wait... {files_uploaded.len()} of {files_count} files processed",
