@@ -594,7 +594,7 @@ fn app() -> Element {
                     cancel_processing.set(true);
 
                 },
-                "Cancel"
+                "Cancel processing"
             }
             div {
                 class: "popup",
