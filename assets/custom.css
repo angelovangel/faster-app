@@ -72,7 +72,7 @@ table {
     background: #fff;
     border-radius: 1px;
     border-collapse: collapse;
-    margin: 1em;
+    margin: 0.5em;
     box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
 }
 
@@ -86,6 +86,10 @@ th {
     cursor: pointer; /* Add this line to change the cursor on hover */
     user-select: none; /* Prevent text selection */
     transition: background-color 0.2s ease;
+}
+
+th.histogram-header {
+    text-align: left;
 }
 
 th.sortable-header {
@@ -136,11 +140,17 @@ tbody tr:hover {
     color: #fff;
     border: none;
     padding: 8px 16px;
-    font-size: 1rem;
+    font-size: 0.9rem;
     border-radius: 4px;
     transition: background-color 0.3s ease, transform 0.2s ease;
 }
 
+.usercontrols-cancel {
+    background-color: #f37736;
+}
+.usercontrols:active {
+    transform: translateY(2px);
+}
 .usercontrols:hover {
     background-color: #1b5e8c;
     color: #fff;
@@ -149,7 +159,7 @@ tbody tr:hover {
 
 select.usercontrols {
     font-family: 'Inter', sans-serif; /* Ensure the font matches your body font */
-    font-size: 1rem; /* Adjust font size */
+    font-size: 0.9rem; /* Adjust font size */
     height: 40px;
     padding: 8px;
     font-size: 1rem;
@@ -165,7 +175,7 @@ select.usercontrols {
 /* Apply font styles to the options inside the dropdown */
 select.usercontrols option {
     font-family: 'Inter', sans-serif; /* Ensure the font is applied to options */
-    font-size: 1rem; /* Match the font size of the select element */
+    font-size: 0.9rem; /* Match the font size of the select element */
     background-color: #1b5e8c;
     color: #fff;
     appearance: none; /* Remove default browser styling */

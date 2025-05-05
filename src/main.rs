@@ -1,9 +1,11 @@
-use std::io;
+use std::io::{Write, Cursor};
+use std::fs::File;
 use std::path::Path;
 use std::sync::Arc;
-use std::io::Cursor;
+//use std::io::Cursor;
 use std::time::{Instant, Duration};
 use arboard::Clipboard;
+use rfd::FileDialog;
 
 use bio::io::fastq;
 use flate2::read::MultiGzDecoder;
@@ -14,6 +16,7 @@ use dioxus::prelude::*;
 
 use human_repr::HumanCount as HC;
 use indicatif::{HumanCount, HumanDuration};
+use tokio::task;
 
 mod modules;
 mod components;
@@ -24,7 +27,7 @@ fn main() {
         WindowBuilder::new()
             .with_focused(true)
             .with_title("fasterx")
-            .with_inner_size(LogicalSize::new(1200, 700)),
+            .with_inner_size(LogicalSize::new(1300, 700)),
     );
     //.with_custom_head(custom_head.to_string());
 
@@ -47,7 +50,7 @@ struct UploadedFile {
     q_vector: Vec<u8>, // Add this field to store the quality scores
 }
 
-async fn decode_reader(bytes: Vec<u8>, filename: &String) -> io::Result<Box<dyn io::Read + Send>> {
+async fn decode_reader(bytes: Vec<u8>, filename: &String) -> std::io::Result<Box<dyn std::io::Read + Send>> {
     if filename.ends_with(".gz") {
         // Use a Cursor to wrap the bytes and pass it to MultiGzDecoder
         let gz = MultiGzDecoder::new(Cursor::new(bytes));
@@ -168,6 +171,99 @@ fn copy_to_clipboard(f_uploaded: Signal<Vec<UploadedFile>>) {
     // Use the `arboard` crate to copy the data to the clipboard
     let mut clipboard = Clipboard::new().unwrap();
     clipboard.set_text(csv_data).unwrap();
+}
+
+fn save_html(f_uploaded: Signal<Vec<UploadedFile>>, numbers_type: String, name_type: String, binsize: usize) {
+    let html_data = {
+        let mut html_data = String::new();
+
+        // Add basic HTML structure
+        html_data.push_str("<!DOCTYPE html>\n<html>\n<head>\n");
+        html_data.push_str("<title>FasterX Results</title>\n");
+        html_data.push_str("<style>\n");
+        html_data.push_str(include_str!("../assets/custom.css")); // Include your CSS styles
+        html_data.push_str("</style>\n");
+        //html_data.push_str("</head>\n<body>\n");
+        //html_data.push_str("<h1>FasterX Results</h1>\n");
+        html_data.push_str("<h2 id='title'>fasterX app results</h2>\n");
+        html_data.push_str("<p>Generated on: ");
+        html_data.push_str(&format!("{}", chrono::Local::now().format("%Y-%m-%d %H:%M:%S")));
+        html_data.push_str("</p>\n");
+        
+        // Add table structure
+        html_data.push_str("<table id='resultstable'>\n<thead>\n<tr>\n");
+        html_data.push_str("<th>File</th><th>Reads</th><th>Bases</th><th>N50</th><th class='histogram-header'>Length Histogram</th><th>GC%</th><th>Q30%</th><th class='histogram-header'>Qscore Histogram</th>\n");
+        html_data.push_str("</tr>\n</thead>\n<tbody>\n");
+
+        // Add table rows
+        for file in f_uploaded.read().iter() {
+            html_data.push_str("<tr>\n");
+            if name_type == "fullpath" {
+                html_data.push_str(&format!("<td>{}</td>\n", file.name));
+            } else {
+                html_data.push_str(&format!("<td>{}</td>\n", file.basename));
+            }
+
+            if numbers_type == "comma" {
+                html_data.push_str(&format!("<td>{}</td>\n", HumanCount(file.reads)));
+                html_data.push_str(&format!("<td>{}</td>\n", HumanCount(file.bases)));
+                html_data.push_str(&format!("<td>{}</td>\n", HumanCount(file.nx)));
+            } else if numbers_type == "human" {
+                html_data.push_str(&format!("<td>{}</td>\n", file.reads.human_count_bare()));
+                html_data.push_str(&format!("<td>{}</td>\n", file.bases.human_count_bare()));
+                html_data.push_str(&format!("<td>{}</td>\n", file.nx.human_count_bare()));
+            } else {
+                html_data.push_str(&format!("<td>{}</td>\n", file.reads));
+                html_data.push_str(&format!("<td>{}</td>\n", file.bases));
+                html_data.push_str(&format!("<td>{}</td>\n", file.nx));
+            }
+
+            // Embed the length histogram as raw HTML
+            html_data.push_str(&format!(
+                "<td class='histogram-cell'>{}</td>\n",
+                generate_l_histogram(&file.l_vector, binsize)
+            ));
+
+            html_data.push_str(&format!("<td>{}</td>\n", file.gc));
+            html_data.push_str(&format!("<td>{}</td>\n", file.q30));
+
+            // Embed the Qscore histogram as raw HTML
+            html_data.push_str(&format!(
+                "<td class='histogram-cell'>{}</td>\n",
+                generate_q_histogram(&file.q_vector)
+            ));
+
+            html_data.push_str("</tr>\n");
+        }
+
+        html_data.push_str("</tbody>\n</table>\n");
+        html_data.push_str("</body>\n</html>");
+
+        html_data
+    };
+
+    // Use `spawn_blocking` to avoid blocking the main thread
+    task::spawn_blocking(move || {
+        let path = std::env::current_dir().unwrap();
+
+        if let Some(mypath) = FileDialog::new()
+            .set_title("Save HTML File")
+            .set_directory(&path)
+            .set_file_name("fasterx_results.html")
+            .save_file()
+        {
+            // Save the HTML to the selected file
+            if let Ok(mut file) = File::create(mypath) {
+                if let Err(e) = file.write_all(html_data.as_bytes()) {
+                    eprintln!("Failed to write HTML file: {}", e);
+                }
+            } else {
+                eprintln!("Failed to create HTML file");
+            }
+        } else {
+            eprintln!("Save operation canceled");
+        }
+    });
 }
 
 fn format_thead(sortby: Signal<(String, bool)>, sortcol: &str) -> String {
@@ -390,20 +486,20 @@ fn app() -> Element {
             }
 
             label {""}
-            button {
-                class: "usercontrols",
-                onclick: move |_| {
-                    files_uploaded.write().clear();
-                    total_bases.set(0);
-                    total_reads.set(0);
-                    files_count.set(0);
-                    name_type_sig.set("basename".to_string());
-                    progress_percentage.set(0.0);
-                },
-                "Clear"
-            }
 
             if files_uploaded.len() > 0{
+                button {
+                    class: "usercontrols",
+                    onclick: move |_| {
+                        files_uploaded.write().clear();
+                        total_bases.set(0);
+                        total_reads.set(0);
+                        files_count.set(0);
+                        name_type_sig.set("basename".to_string());
+                        progress_percentage.set(0.0);
+                    },
+                    "Clear"
+                }
                 button {
                     class: "usercontrols",
                     onclick: move |_| {
@@ -416,7 +512,15 @@ fn app() -> Element {
                             show_popup.set(false);
                         });
                     },
-                    "Copy table to clipboard"
+                    "Copy to clipboard"
+                }
+
+                button {
+                    class: "usercontrols",
+                    onclick: move |_| {
+                        save_html(files_uploaded.clone(), numbers(), name_type_sig(), basesperbin());
+                    },
+                    "Save as HTML"
                 }
                 
                 select {
@@ -529,13 +633,8 @@ fn app() -> Element {
                             {format_thead(sort_by, "nx")}
                         }
                         th {
-                            // class: "sortable-header",
-                            // onclick: {
-                            //     let current_sort = sort_by.read().1;
-                            //     move |_| sort_by.set(("nx".to_string(), !current_sort))
-                            // },
+                            class: "histogram-header",
                             "Length histogram"
-                            //{format_thead(sort_by, "nx")}
                         }
                         th {
                             class: "sortable-header",
@@ -565,13 +664,8 @@ fn app() -> Element {
                             {format_thead(sort_by, "q30")}
                         }
                         th {
-                            // class: "sortable-header",
-                            // onclick: {
-                            //     let current_sort = sort_by.read().1;
-                            //     move |_| sort_by.set(("m_qscore".to_string(), !current_sort))
-                            // },
+                            class: "histogram-header",
                             "Qscore histogram"
-                            //{format_thead(sort_by, "m_qscore")}
                         }
                     }
                 }
@@ -589,12 +683,12 @@ fn app() -> Element {
 
         if *busy.read() {
             button {
-                class: "usercontrols",
+                class: "usercontrols usercontrols-cancel",
                 onclick: move |_| {
                     cancel_processing.set(true);
 
                 },
-                "Cancel processing"
+                "Cancel processing ✕"
             }
             div {
                 class: "popup",
