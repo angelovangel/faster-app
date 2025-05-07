@@ -121,6 +121,7 @@ fn maketable(
                 td {"{f.gc}"}
                 //td {"{f.q20}"}
                 td {"{f.q30}"}
+                td {"{f.m_qscore}"}
                 td {
                     class: "histogram-cell",
                     dangerous_inner_html: "{generate_q_histogram(&f.q_vector)}" // Render the histogram as HTML
@@ -192,7 +193,7 @@ fn save_html(f_uploaded: Signal<Vec<UploadedFile>>, numbers_type: String, name_t
         
         // Add table structure
         html_data.push_str("<table id='resultstable'>\n<thead>\n<tr>\n");
-        html_data.push_str("<th>File</th><th>Reads</th><th>Bases</th><th>N50</th><th class='histogram-header'>Length Histogram</th><th>GC%</th><th>Q30%</th><th class='histogram-header'>Qscore Histogram</th>\n");
+        html_data.push_str("<th>File</th><th>Reads</th><th>Bases</th><th>N50</th><th class='histogram-header'>Length Histogram</th><th>GC%</th><th>Q30%</th><th>Median Qscore</th><th class='histogram-header'>Qscore Histogram</th>\n");
         html_data.push_str("</tr>\n</thead>\n<tbody>\n");
 
         // Add table rows
@@ -226,6 +227,7 @@ fn save_html(f_uploaded: Signal<Vec<UploadedFile>>, numbers_type: String, name_t
 
             html_data.push_str(&format!("<td>{}</td>\n", file.gc));
             html_data.push_str(&format!("<td>{}</td>\n", file.q30));
+            html_data.push_str(&format!("<td>{}</td>\n", file.m_qscore));
 
             // Embed the Qscore histogram as raw HTML
             html_data.push_str(&format!(
@@ -662,6 +664,15 @@ fn app() -> Element {
                             },
                             "Q30% ",
                             {format_thead(sort_by, "q30")}
+                        }
+                        th {
+                            class: "sortable-header",
+                            onclick: {
+                                let current_sort = sort_by.read().1;
+                                move |_| sort_by.set(("m_qscore".to_string(), !current_sort))
+                            },
+                            "Median Qscore ",
+                            {format_thead(sort_by, "m_qscore")}
                         }
                         th {
                             class: "histogram-header",
