@@ -575,12 +575,13 @@ fn app() -> Element {
                         step: "50", // Set the step size for increment/decrement
                         oninput: move |ev| {
                             if let Ok(value) = ev.value().parse::<usize>() {
-                                basesperbin.set(value); // Update the basesperbin signal
+                                if value > 0 {
+                                    basesperbin.set(value); // Update the basesperbin signal
+                                }
                             }
-                        },
+                        }
                     }
                 }
-                
             }
         }
 
