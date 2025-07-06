@@ -305,7 +305,8 @@ fn generate_q_histogram(q_vector: &[u8]) -> String {
             let percent = format!("{:.0}", count as f64 / sum_count as f64 * 100.0);
             format!(
                 r#"<div class="bar" style="height: {height}%;">
-                    <div class="tooltip">Q {range_start}-{range_end}: {count} reads ({percent} %)</div>
+                    <div class="tooltip">Q {range_start}-{range_end}: <br/>
+                    {count} reads ({percent}%)</div>
                 </div>"#,
                 height = height,
                 range_start = i * 2,
@@ -320,15 +321,36 @@ fn generate_q_histogram(q_vector: &[u8]) -> String {
 fn generate_l_histogram(l_vector: &[i64], binsize: usize) -> String {
     let mut bins = [0; 30]; // Create 30 bins for the histogram
     let max_bin_index = bins.len() - 1; // Index of the last bin
-    
+
     for &l in l_vector {
-        let bin = l as usize/ binsize; // 1 bin spans binsize bp
+        let bin = l as usize / binsize; // 1 bin spans binsize bp
         if bin < bins.len() {
             bins[bin] += 1;
         } else {
             bins[max_bin_index] += 1; // Increment the last bin for out-of-range values
         }
     }
+
+    // Calculate bases per bin
+    let bases_per_bin: Vec<usize> = bins.iter().enumerate()
+        .map(|(i, _)| {
+            if i == max_bin_index {
+                // Last bin: from (max_bin_index * binsize) to infinity
+                l_vector.iter()
+                    .filter(|&&l| (l as usize) >= max_bin_index * binsize)
+                    .map(|&l| l as usize)
+                    .sum()
+            } else {
+                // Bin: from (i * binsize) to ((i+1) * binsize)
+                l_vector.iter()
+                    .filter(|&&l| (l as usize) >= i * binsize && (l as usize) < (i + 1) * binsize)
+                    .map(|&l| l as usize)
+                    .sum()
+            }
+        })
+        .collect();
+
+    let total_bases: usize = l_vector.iter().map(|&l| l as usize).sum();
 
     // Find the maximum count to normalize the bar heights
     let max_count = *bins.iter().max().unwrap_or(&1);
@@ -339,21 +361,32 @@ fn generate_l_histogram(l_vector: &[i64], binsize: usize) -> String {
         .enumerate()
         .map(|(i, &count)| {
             let height = (count as f64 / max_count as f64) * 100.0; // Normalize height to a percentage
-            let percent = format!("{:.0}", count as f64 / sum_count as f64 * 100.0);
+            let percent = format!("{:.1}", count as f64 / sum_count as f64 * 100.0);
             let range_start = i * binsize;
             let range_end = if i == max_bin_index {
                 format!(">{}", range_start.human_count_bare()) // Use ">range_start" for the last bin
             } else {
                 format!("{}-{}", range_start.human_count_bare(), (range_start + binsize).human_count_bare())
             };
+            let bases = bases_per_bin[i];
+            let bases_percent = if total_bases > 0 {
+                format!("{:.1}", bases as f64 / total_bases as f64 * 100.0)
+            } else {
+                "0.0".to_string()
+            };
 
             format!(
                 r#"<div class="bar" style="height: {height}%;">
-                    <div class="tooltip">Length {range_end}: {count} reads ({percent} %) </div>
+                    <div class="tooltip">Length {range_end}: <br/> 
+                    {count} reads ({percent}%)<br/>
+                    {bases} bases ({bases_percent}%)</div>
                 </div>"#,
                 height = height,
                 range_end = range_end,
-                count = count.human_count_bare()
+                count = count.human_count_bare(),
+                percent = percent,
+                bases = bases.human_count_bare(),
+                bases_percent = bases_percent
             )
         })
         .collect::<Vec<_>>()
@@ -690,7 +723,7 @@ fn app() -> Element {
         // Footer with app version info
         footer {
             class: "app-footer",
-            "fasterX app - v0.2.4 © 2025"
+            {format!("fasterX app - v{} @ 2025", env!("CARGO_PKG_VERSION"))}
         }
 
         if *busy.read() {
