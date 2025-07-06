@@ -66,6 +66,7 @@ fn maketable(
     name_type: String,
     numbers_type: String,
     binsize: Signal<usize>,
+    spark_type: Signal<String>,
     treads: Signal<u64>,
     tbases: Signal<u64>,
     sort_by: Signal<(String, bool)>, // Track column and sort direction
@@ -116,7 +117,7 @@ fn maketable(
                 }
                 td {
                     class: "histogram-cell",
-                    dangerous_inner_html: "{generate_l_histogram(&f.l_vector, binsize())}"
+                    dangerous_inner_html: "{generate_l_histogram(&f.l_vector, binsize(), spark_type())}" // Render the histogram as HTML
                 }
                 td {"{f.gc}"}
                 //td {"{f.q20}"}
@@ -141,6 +142,7 @@ fn maketable(
                 td {"{treads()}"}
                 td {"{tbases()}"}
             }
+            td {  }
             td {  }
             td {  }
             td {  }
@@ -174,7 +176,7 @@ fn copy_to_clipboard(f_uploaded: Signal<Vec<UploadedFile>>) {
     clipboard.set_text(csv_data).unwrap();
 }
 
-fn save_html(f_uploaded: Signal<Vec<UploadedFile>>, numbers_type: String, name_type: String, binsize: usize) {
+fn save_html(f_uploaded: Signal<Vec<UploadedFile>>, numbers_type: String, name_type: String, binsize: usize, plot_type: String) {
     let html_data = {
         let mut html_data = String::new();
 
@@ -222,7 +224,7 @@ fn save_html(f_uploaded: Signal<Vec<UploadedFile>>, numbers_type: String, name_t
             // Embed the length histogram as raw HTML
             html_data.push_str(&format!(
                 "<td class='histogram-cell'>{}</td>\n",
-                generate_l_histogram(&file.l_vector, binsize)
+                generate_l_histogram(&file.l_vector, binsize, plot_type.clone())
             ));
 
             html_data.push_str(&format!("<td>{}</td>\n", file.gc));
@@ -318,7 +320,7 @@ fn generate_q_histogram(q_vector: &[u8]) -> String {
         .join("") // Combine all bars into a single string
 }
 
-fn generate_l_histogram(l_vector: &[i64], binsize: usize) -> String {
+fn generate_l_histogram(l_vector: &[i64], binsize: usize, plot_type: String) -> String {
     let mut bins = [0; 30]; // Create 30 bins for the histogram
     let max_bin_index = bins.len() - 1; // Index of the last bin
 
@@ -350,18 +352,23 @@ fn generate_l_histogram(l_vector: &[i64], binsize: usize) -> String {
         })
         .collect();
 
-    let total_bases: usize = l_vector.iter().map(|&l| l as usize).sum();
 
     // Find the maximum count to normalize the bar heights
-    let max_count = *bins.iter().max().unwrap_or(&1);
-    let sum_count = bins.iter().sum::<u64>();
-
+    let reads_max_bin = *bins.iter().max().unwrap_or(&1); // note sparkline bar is normalised relative to the max count, not sum count
+    let total_reads = bins.iter().sum::<u64>();
+    // same for bases
+    let bases_max_bin = *bases_per_bin.iter().max().unwrap_or(&1);
+    let total_bases: usize = l_vector.iter().map(|&l| l as usize).sum();
     // Generate HTML for the bar chart
     bins.iter()
         .enumerate()
         .map(|(i, &count)| {
-            let height = (count as f64 / max_count as f64) * 100.0; // Normalize height to a percentage
-            let percent = format!("{:.1}", count as f64 / sum_count as f64 * 100.0);
+            let height = if plot_type == "reads" {
+                (count as f64 / reads_max_bin as f64) * 100.0
+            } else {
+                (bases_per_bin[i] as f64 / bases_max_bin as f64) * 100.0
+            }; // Normalize height to a percentage
+            let percent = format!("{:.1}", count as f64 / total_reads as f64 * 100.0);
             let range_start = i * binsize;
             let range_end = if i == max_bin_index {
                 format!(">{}", range_start.human_count_bare()) // Use ">range_start" for the last bin
@@ -397,6 +404,7 @@ fn app() -> Element {
     //let mut enable_directory_upload = use_signal(|| false);
     let mut numbers = use_signal(|| String::new());
     let mut basesperbin = use_signal(|| 1000);
+    let mut spark_type = use_signal(|| "bases".to_string()); // Default to "bases"
     let mut name_type_sig = use_signal(|| String::new());
     let mut files_uploaded = use_signal(|| Vec::new() as Vec<UploadedFile>);
     let mut files_count = use_signal(|| 0);
@@ -553,7 +561,7 @@ fn app() -> Element {
                 button {
                     class: "usercontrols",
                     onclick: move |_| {
-                        save_html(files_uploaded.clone(), numbers(), name_type_sig(), basesperbin());
+                        save_html(files_uploaded.clone(), numbers(), name_type_sig(), basesperbin(), spark_type());
                     },
                     "Save as HTML"
                 }
@@ -588,6 +596,17 @@ fn app() -> Element {
                         option {value: "human", "SI suffix"}
                     }
                 }
+
+                select {  
+                    r#name: "spark_type", id: "spark_type",
+                    class: "usercontrols",
+                    multiple: "false",
+                    oninput: move |ev| {
+                        spark_type.set(ev.value())
+                    },
+                    option {value: "bases", "Plot bases"},
+                    option {value: "reads", "Plot reads"}
+                }
                 
                 div {
                     class: "tooltip-container",
@@ -615,7 +634,8 @@ fn app() -> Element {
                         }
                     }
                 }
-            }
+        }
+
         }
 
         if files_uploaded.len() > 0 {
@@ -715,7 +735,7 @@ fn app() -> Element {
                     }
                 }
                 tbody {
-                    {maketable(files_uploaded, name_type_sig(), numbers(), basesperbin, total_reads, total_bases, sort_by)}
+                    {maketable(files_uploaded, name_type_sig(), numbers(), basesperbin, spark_type, total_reads, total_bases, sort_by)}
                 }
             }
         }
