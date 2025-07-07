@@ -4,6 +4,7 @@ use std::path::Path;
 use std::sync::Arc;
 //use std::io::Cursor;
 use std::time::{Instant, Duration};
+use std::collections::BTreeMap;
 use arboard::Clipboard;
 use rfd::FileDialog;
 
@@ -48,6 +49,7 @@ struct UploadedFile {
     q30: String,
     m_qscore: u8, // median q score
     q_vector: Vec<u8>, // Add this field to store the quality scores
+    q_hash: BTreeMap<u8, i64> 
 }
 
 async fn decode_reader(bytes: Vec<u8>, filename: &String) -> std::io::Result<Box<dyn std::io::Read + Send>> {
@@ -123,9 +125,16 @@ fn maketable(
                 //td {"{f.q20}"}
                 td {"{f.q30}"}
                 td {"{f.m_qscore}"}
-                td {
-                    class: "histogram-cell",
-                    dangerous_inner_html: "{generate_q_histogram(&f.q_vector)}" // Render the histogram as HTML
+                if spark_type() == "bases" {
+                    td {
+                        class: "histogram-cell",
+                        dangerous_inner_html: "{generate_qbases_histogram(&f.q_hash)}" // Render the histogram as HTML
+                    }
+                } else {
+                    td {
+                        class: "histogram-cell",
+                        dangerous_inner_html: "{generate_q_histogram(&f.q_vector)}" // Render the histogram as HTML
+                    }
                 }
             }
         }
@@ -195,7 +204,13 @@ fn save_html(f_uploaded: Signal<Vec<UploadedFile>>, numbers_type: String, name_t
         
         // Add table structure
         html_data.push_str("<table id='resultstable'>\n<thead>\n<tr>\n");
-        html_data.push_str("<th>File</th><th>Reads</th><th>Bases</th><th>N50</th><th class='histogram-header'>Length Histogram</th><th>GC%</th><th>Q30%</th><th>Median Qscore</th><th class='histogram-header'>Qscore Histogram</th>\n");
+        if plot_type == "bases" {
+            html_data.push_str("<th>File</th><th>Reads</th><th>Bases</th><th>N50</th><th class='histogram-header'>Bases Length Histogram</th><th>GC%</th><th>Q30%</th><th>Median Qscore</th><th class='histogram-header'>Bases Qscore Histogram</th>\n");
+        } else {
+            html_data.push_str("<th>File</th><th>Reads</th><th>Bases</th><th>N50</th><th class='histogram-header'>Reads Length Histogram</th><th>GC%</th><th>Q30%</th><th>Median Qscore</th><th class='histogram-header'>Reads Qscore Histogram</th>\n");
+        }
+        //html_data.push_str("<th>File</th><th>Reads</th><th>Bases</th><th>N50</th><th class='histogram-header'>Length Histogram</th><th>GC%</th><th>Q30%</th><th>Median Qscore</th><th class='histogram-header'>Qscore Histogram</th>\n");
+        
         html_data.push_str("</tr>\n</thead>\n<tbody>\n");
 
         // Add table rows
@@ -234,7 +249,11 @@ fn save_html(f_uploaded: Signal<Vec<UploadedFile>>, numbers_type: String, name_t
             // Embed the Qscore histogram as raw HTML
             html_data.push_str(&format!(
                 "<td class='histogram-cell'>{}</td>\n",
-                generate_q_histogram(&file.q_vector)
+                if plot_type == "bases" {
+                    generate_qbases_histogram(&file.q_hash)
+                } else {
+                    generate_q_histogram(&file.q_vector)
+            }
             ));
 
             html_data.push_str("</tr>\n");
@@ -318,6 +337,49 @@ fn generate_q_histogram(q_vector: &[u8]) -> String {
         })
         .collect::<Vec<_>>()
         .join("") // Combine all bars into a single string
+}
+
+fn generate_qbases_histogram(q_hash: &std::collections::BTreeMap<u8, i64>) -> String {
+    let mut bins = [0i64; 30]; // 30 bins for Q 0-60 (2 per bin)
+    let max_bin_index = bins.len() - 1;
+
+    // Bin the bases by quality score (q_hash: quality -> bases count)
+    for (&q, &count) in q_hash.iter() {
+        let phred = q.saturating_sub(33);
+        let bin = (phred / 2) as usize;
+        if bin < bins.len() {
+            bins[bin] += count;
+        } else {
+            bins[max_bin_index] += count;
+        }
+}
+
+    let max_bases = *bins.iter().max().unwrap_or(&1);
+    let total_bases: i64 = bins.iter().sum();
+
+    bins.iter()
+        .enumerate()
+        .map(|(i, &bases)| {
+            let height = (bases as f64 / max_bases as f64) * 100.0;
+            let percent = if total_bases > 0 {
+                format!("{:.1}", bases as f64 / total_bases as f64 * 100.0)
+            } else {
+                "0.0".to_string()
+            };
+            format!(
+                r#"<div class="bar" style="height: {height}%;">
+                    <div class="tooltip">Q {range_start}-{range_end}:<br/>
+                    {bases} bases ({percent}%)</div>
+                </div>"#,
+                height = height,
+                range_start = i * 2,
+                range_end = i * 2 + 2,
+                bases = bases.human_count_bare(),
+                percent = percent
+            )
+        })
+        .collect::<Vec<_>>()
+        .join("")
 }
 
 fn generate_l_histogram(l_vector: &[i64], binsize: usize, plot_type: String) -> String {
@@ -435,6 +497,7 @@ fn app() -> Element {
             let mut qual30: i64 = 0;
             let mut len_vector: Vec<i64> = Vec::new();
             let mut qual_vector: Vec<u8> = Vec::new();
+            let mut qhash: BTreeMap<u8, i64> = BTreeMap::new();
 
             if let Some(bytes) = file_engine.read_file(&file).await {
                 let filepath = Path::new(&file);
@@ -453,6 +516,9 @@ fn app() -> Element {
                     qual30 += modules::get_qual_bases(rec.qual(), 63); // 33 offset
                     len_vector.push(rec.seq().len() as i64);
                     qual_vector.push(modules::qscore_mean(rec.qual()));
+                    for q in rec.qual().to_owned() {
+                        *qhash.entry(q).or_insert(0) += 1; // Count occurrences of each quality score
+                    }
 
                     tokio::task::yield_now().await; // Yield to allow the UI to update
                 }
@@ -471,6 +537,7 @@ fn app() -> Element {
                     m_qscore: median_qscore,
                     q_vector: qual_vector.clone(),
                     l_vector: len_vector.clone(),
+                    q_hash: qhash.clone(),
                 });
 
                 progress_percentage.set((files_uploaded.len() as f64 / *files_count.read() as f64) * 100.0);
@@ -688,9 +755,16 @@ fn app() -> Element {
                             "N50 ",
                             {format_thead(sort_by, "nx")}
                         }
-                        th {
-                            class: "histogram-header",
-                            "Length histogram"
+                        if spark_type() == "bases" {
+                            th {
+                                class: "histogram-header",
+                                "Bases length histogram",
+                            }
+                        } else {
+                            th {
+                                class: "histogram-header",
+                                "Reads length histogram",
+                            }
                         }
                         th {
                             class: "sortable-header",
@@ -725,12 +799,19 @@ fn app() -> Element {
                                 let current_sort = sort_by.read().1;
                                 move |_| sort_by.set(("m_qscore".to_string(), !current_sort))
                             },
-                            "Median Qscore ",
+                            "Reads median Qscore ",
                             {format_thead(sort_by, "m_qscore")}
                         }
-                        th {
-                            class: "histogram-header",
-                            "Qscore histogram"
+                        if spark_type() == "bases" {
+                            th {
+                                class: "histogram-header",
+                                "Bases Qscore histogram"
+                            }
+                        } else {
+                            th {
+                                class: "histogram-header",
+                                "Reads Qscore histogram"
+                            }
                         }
                     }
                 }
@@ -743,8 +824,17 @@ fn app() -> Element {
         // Footer with app version info
         footer {
             class: "app-footer",
-            {format!("fasterX app - v{} @ 2025", env!("CARGO_PKG_VERSION"))}
-        }
+            {format!("fasterX v{} © 2025 | ", env!("CARGO_PKG_VERSION"))}
+            a {
+            href: "#",
+            style: "text-decoration: none; color: inherit; cursor: pointer;",
+            onclick: move |_| {
+                let _ = open::that("https://github.com/angelovangel/faster-app");
+            },
+            dangerous_inner_html: r#"<svg height="18" width="18" viewBox="0 0 16 16" fill="currentColor" style="vertical-align:middle; margin-right:4px;"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.01.08-2.12 0 0 .67-.21 2.2.82a7.65 7.65 0 0 1 2-.27c.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.11.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.19 0 .21.15.46.55.38A8.013 8.013 0 0 0 16 8c0-4.42-3.58-8-8-8z"/></svg>"#,
+            //"GitHub"
+            }
+}
 
         if *busy.read() {
             button {
