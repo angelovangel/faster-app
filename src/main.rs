@@ -6,6 +6,7 @@ use std::sync::Arc;
 use std::time::{Instant, Duration};
 use std::collections::BTreeMap;
 use arboard::Clipboard;
+use dioxus::html::p;
 use rfd::FileDialog;
 
 use bio::io::fastq;
@@ -125,10 +126,10 @@ fn maketable(
                 //td {"{f.q20}"}
                 td {"{f.q30}"}
                 td {"{f.m_qscore}"}
-                if spark_type() == "bases" {
+                if spark_type() != "reads" {
                     td {
                         class: "histogram-cell",
-                        dangerous_inner_html: "{generate_qbases_histogram(&f.q_hash)}" // Render the histogram as HTML
+                        dangerous_inner_html: "{generate_qbases_histogram(&f.q_hash, spark_type())}" // Render the histogram as HTML
                     }
                 } else {
                     td {
@@ -250,7 +251,7 @@ fn save_html(f_uploaded: Signal<Vec<UploadedFile>>, numbers_type: String, name_t
             html_data.push_str(&format!(
                 "<td class='histogram-cell'>{}</td>\n",
                 if plot_type == "bases" {
-                    generate_qbases_histogram(&file.q_hash)
+                    generate_qbases_histogram(&file.q_hash, plot_type.clone())
                 } else {
                     generate_q_histogram(&file.q_vector)
             }
@@ -339,7 +340,7 @@ fn generate_q_histogram(q_vector: &[u8]) -> String {
         .join("") // Combine all bars into a single string
 }
 
-fn generate_qbases_histogram(q_hash: &std::collections::BTreeMap<u8, i64>) -> String {
+fn generate_qbases_histogram(q_hash: &std::collections::BTreeMap<u8, i64>, ptype: String) -> String {
     let mut bins = [0i64; 30]; // 30 bins for Q 0-60 (2 per bin)
     let max_bin_index = bins.len() - 1;
 
@@ -356,11 +357,20 @@ fn generate_qbases_histogram(q_hash: &std::collections::BTreeMap<u8, i64>) -> St
 
     let max_bases = *bins.iter().max().unwrap_or(&1);
     let total_bases: i64 = bins.iter().sum();
+    let mut temp_total = total_bases;
 
     bins.iter()
         .enumerate()
         .map(|(i, &bases)| {
-            let height = (bases as f64 / max_bases as f64) * 100.0;
+            let height = match ptype.as_str() {
+            "cumulative" => {
+                let h = (temp_total - bases) as f64 / total_bases as f64 * 100.0;
+                temp_total -= bases; // Decrease the total for the next bin
+                h
+            }
+            _ => (bases as f64 / max_bases as f64) * 100.0,
+        };
+
             let percent = if total_bases > 0 {
                 format!("{:.1}", bases as f64 / total_bases as f64 * 100.0)
             } else {
@@ -421,16 +431,43 @@ fn generate_l_histogram(l_vector: &[i64], binsize: usize, plot_type: String) -> 
     // same for bases
     let bases_max_bin = *bases_per_bin.iter().max().unwrap_or(&1);
     let total_bases: usize = l_vector.iter().map(|&l| l as usize).sum();
+    let mut temp_total_bases = total_bases;
     // Generate HTML for the bar chart
     bins.iter()
         .enumerate()
-        .map(|(i, &count)| {
-            let height = if plot_type == "reads" {
-                (count as f64 / reads_max_bin as f64) * 100.0
-            } else {
-                (bases_per_bin[i] as f64 / bases_max_bin as f64) * 100.0
-            }; // Normalize height to a percentage
-            let percent = format!("{:.1}", count as f64 / total_reads as f64 * 100.0);
+        .map(|(i, &reads_count)| {
+        let (height, bases_percent) = match plot_type.as_str() {
+            "reads" => {
+                let h = (reads_count as f64 / reads_max_bin as f64) * 100.0;
+                let p = if total_reads > 0 {
+                    format!("{:.1}", bases_per_bin[i] as f64 / total_bases as f64 * 100.0)
+                } else {
+                    "0.0".to_string()
+                };
+                (h, p)
+            }
+            "cumulative" => {
+                let h = (temp_total_bases as f64 / total_bases as f64) * 100.0;
+                let p = if temp_total_bases > 0 {
+                    format!("{:.1}", temp_total_bases as f64 / total_bases as f64 * 100.0)
+                } else {
+                    "0.0".to_string()
+                };
+                temp_total_bases -= bases_per_bin[i];
+                (h, p)
+            }
+            _ => {
+                let h = (bases_per_bin[i] as f64 / bases_max_bin as f64) * 100.0;
+                let p = if total_bases > 0 {
+                    format!("{:.1}", bases_per_bin[i] as f64 / total_bases as f64 * 100.0)
+                } else {
+                    "0.0".to_string()
+                };
+                (h, p)
+            }
+        };
+
+            let reads_percent = format!("{:.1}", reads_count as f64 / total_reads as f64 * 100.0);
             let range_start = i * binsize;
             let range_end = if i == max_bin_index {
                 format!(">{}", range_start.human_count_bare()) // Use ">range_start" for the last bin
@@ -438,22 +475,17 @@ fn generate_l_histogram(l_vector: &[i64], binsize: usize, plot_type: String) -> 
                 format!("{}-{}", range_start.human_count_bare(), (range_start + binsize).human_count_bare())
             };
             let bases = bases_per_bin[i];
-            let bases_percent = if total_bases > 0 {
-                format!("{:.1}", bases as f64 / total_bases as f64 * 100.0)
-            } else {
-                "0.0".to_string()
-            };
 
             format!(
                 r#"<div class="bar" style="height: {height}%;">
                     <div class="tooltip">Length {range_end}: <br/> 
-                    {count} reads ({percent}%)<br/>
+                    {reads_count} reads ({percent}%)<br/>
                     {bases} bases ({bases_percent}%)</div>
                 </div>"#,
                 height = height,
                 range_end = range_end,
-                count = count.human_count_bare(),
-                percent = percent,
+                reads_count = reads_count.human_count_bare(),
+                percent = reads_percent,
                 bases = bases.human_count_bare(),
                 bases_percent = bases_percent
             )
@@ -672,6 +704,7 @@ fn app() -> Element {
                         spark_type.set(ev.value())
                     },
                     option {value: "bases", "Plot bases"},
+                    option {value: "cumulative", "Plot cumulative bases"},
                     option {value: "reads", "Plot reads"}
                 }
                 
@@ -760,6 +793,12 @@ fn app() -> Element {
                                 class: "histogram-header",
                                 "Bases length histogram",
                             }
+                        } else if spark_type() == "cumulative" {
+                            th {
+                                class: "histogram-header",
+                                "Cumulative bases length histogram",
+                            }
+
                         } else {
                             th {
                                 class: "histogram-header",
@@ -806,6 +845,11 @@ fn app() -> Element {
                             th {
                                 class: "histogram-header",
                                 "Bases Qscore histogram"
+                            }
+                        } else if spark_type() == "cumulative" {
+                            th {
+                                class: "histogram-header",
+                                "Cumulative bases Qscore histogram" 
                             }
                         } else {
                             th {
