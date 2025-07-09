@@ -6,7 +6,6 @@ use std::sync::Arc;
 use std::time::{Instant, Duration};
 use std::collections::BTreeMap;
 use arboard::Clipboard;
-// use dioxus::html::embed::height;
 use rfd::FileDialog;
 
 use bio::io::fastq;
@@ -786,6 +785,8 @@ fn app() -> Element {
         }
 
         if files_uploaded.len() > 0 {
+           div {
+            class: "table-scroll" ,
             table {
                 id: "resultstable",
                 thead {
@@ -909,6 +910,7 @@ fn app() -> Element {
                 tbody {
                     {maketable(files_uploaded, name_type_sig(), numbers(), basesperbin, spark_type, total_reads, total_bases, sort_by)}
                 }
+            }
             }
         }
 

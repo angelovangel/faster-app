@@ -110,14 +110,14 @@ td {
 
 tr.total-row {
   border-top: 2px solid #1b5e8c;
-  background-color: #2E86C1;
+  background-color: #d1d1d2;
 }
 tr.total-row:hover {
   background-color: #1b5e8c;
 }
 
 tr.total-row td {
-  color: white;
+  color: #555;
   font-weight: bold;
 }
 
@@ -131,7 +131,7 @@ tbody tr:hover {
 
 .usercontrols {
     cursor: pointer;
-    margin: 0.5em;
+    margin: 0.1em 0.2em;
     display: inline-block;
     font-weight: 500;
     line-height: 1.5;
@@ -160,10 +160,9 @@ tbody tr:hover {
 select.usercontrols {
     font-family: 'Inter', sans-serif; /* Ensure the font matches your body font */
     font-size: 0.9rem; /* Adjust font size */
-    height: 40px;
+    /*height: 40px;*/
     padding: 8px;
-    font-size: 1rem;
-    border: 1px solid #ccc;
+    border: 1px solid #2E86C1;;
     border-radius: 4px;
     background-color: #fff;
     color: #333;
@@ -213,6 +212,22 @@ select.usercontrols option {
 
 td, th {
     vertical-align: bottom; /* Align content to the bottom of the cell */
+}
+.table-scroll {
+    max-height: 80vh;      /* Adjust as needed */
+    overflow-y: auto;
+    margin-bottom: 1em;
+    border-radius: 4px;
+    background: #fff;
+}
+
+/* Make the table header sticky */
+#resultstable thead th {
+    position: sticky;
+    top: 0;
+    background: #fff;
+    z-index: 2;
+    box-shadow: 0 2px 2px -1px rgba(0,0,0,0.04);
 }
 
 td.histogram-cell, th.histogram-cell {
@@ -292,7 +307,7 @@ td.histogram-cell, th.histogram-cell {
 .app-footer {
     width: 100%;
     text-align: right;
-    padding: 10px 10px;
+    padding: 5px 5px;
     background-color: #f9f9f9; /* Light background for contrast */
     color: #555; /* Text color */
     font-size: 0.8rem; /* Slightly smaller font size */
