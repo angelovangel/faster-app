@@ -4,7 +4,7 @@ pub fn app_title() -> Element {
     rsx! {
         div {
             id: "title",
-            h2 { "Simple fastx file analysis" }
+            h3 { "Simple fastx file analysis" }
         }
         div {
             p{
