@@ -72,7 +72,7 @@ fn maketable(
     treads: Signal<u64>,
     tbases: Signal<u64>,
     sort_by: Signal<(String, bool)>, // Track column and sort direction
-) -> Element {
+    ) -> Element {
     let mut sorted_entries = entries.read().clone();
 
     // Sort entries based on the current column and direction
@@ -542,12 +542,13 @@ fn generate_l_histogram(l_vector: &[i64], binsize: usize, plot_type: String) -> 
 
 fn app() -> Element {
     //let mut enable_directory_upload = use_signal(|| false);
-    let mut numbers = use_signal(|| String::new());
+    let mut numbers = use_signal(|| "none".to_string());
     let mut basesperbin = use_signal(|| 1000);
     let mut spark_type = use_signal(|| "reads".to_string()); // Default to "reads"
-    let mut name_type_sig = use_signal(|| String::new());
+    let mut name_type_sig = use_signal(|| "basename".to_string());
     let mut files_uploaded = use_signal(|| Vec::new() as Vec<UploadedFile>);
-    let mut files_count = use_signal(|| 0);
+    let mut files_count_pre = use_signal(|| 0);
+    let mut files_count_post = use_signal(|| 0);
     
     let mut total_reads = use_signal(|| 0);
     let mut total_bases = use_signal(|| 0);
@@ -617,10 +618,11 @@ fn app() -> Element {
                     l_vector: len_vector.clone(),
                     q_hash: qhash.clone(),
                 });
-
-                progress_percentage.set((files_uploaded.len() as f64 / *files_count.read() as f64) * 100.0);
-                tokio::task::yield_now().await; // Yield to allow the UI to update
-                tokio::time::sleep(std::time::Duration::from_millis(500)).await; // this makes sure that the progress is drawn
+                let prev_count = *files_count_post.read();
+                files_count_post.set(prev_count + 1); // increment after each file processed
+                progress_percentage.set((*files_count_post.read() as f64 / *files_count_pre.read() as f64) * 100.0);
+                tokio::task::yield_now().await;
+                tokio::time::sleep(std::time::Duration::from_millis(500)).await;
                 total_bases += nbases;
                 total_reads += nreads;
             }
@@ -636,7 +638,8 @@ fn app() -> Element {
     let upload_files = move |evt: FormEvent| {
         if let Some(file_engine) = evt.files() {
             busy.set(true);
-            files_count.set(file_engine.files().len());
+            files_count_pre.set(file_engine.files().len());
+            files_count_post.set(0);
             start_time.set(Instant::now()); // Record the start time
             
             spawn(async move { 
@@ -649,6 +652,7 @@ fn app() -> Element {
                 progress_percentage.set(0.0);
                 tokio::time::sleep(std::time::Duration::from_secs(3)).await; // Wait for 3 seconds
                 ready.set(false); // Hide the popup
+                //files_count.set(0);
             });
         } 
     };
@@ -658,7 +662,7 @@ fn app() -> Element {
             {include_str!("../assets/custom.css")} 
         }
         
-        {components::app_title(files_count)}
+        {components::app_title(files_count_post)}
         
         div {
             label { r#for: "textreader", "" }
@@ -682,7 +686,8 @@ fn app() -> Element {
                         files_uploaded.write().clear();
                         total_bases.set(0);
                         total_reads.set(0);
-                        files_count.set(0);
+                        files_count_pre.set(0);
+                        files_count_post.set(0);
                         name_type_sig.set("basename".to_string());
                         progress_percentage.set(0.0);
                     },
@@ -886,7 +891,7 @@ fn app() -> Element {
                                 let current_sort = sort_by.read().1;
                                 move |_| sort_by.set(("m_qscore".to_string(), !current_sort))
                             },
-                            "Reads median Qscore ",
+                            "Reads median Q",
                             {format_thead(sort_by, "m_qscore")}
                         }
                         if spark_type() == "bases" {
@@ -940,7 +945,7 @@ fn app() -> Element {
             }
             div {
                 class: "popup",
-                "Please wait... {files_uploaded.len()} of {files_count} files processed",
+                "Please wait... {files_count_post} of {files_count_pre} files processed",
                 div {
                     class: "progress-bar-container",
                     div {
@@ -954,7 +959,7 @@ fn app() -> Element {
         if *ready.read() {
             div {
                 class: "popup",
-                "Finished processing {files_count} files in {myduration}!"
+                "Finished processing {files_count_post} files in {myduration}!"
             }
         }
 
