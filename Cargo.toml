@@ -22,6 +22,7 @@ arboard = "2.0"
 rfd = "0.12"
 chrono = "0.4"
 open = "5"
+natord = "1"
 
 # Debug
 log = "0.4.19"

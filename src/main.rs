@@ -79,7 +79,7 @@ fn maketable(
     let (column, ascending) = sort_by.read().clone();
     sorted_entries.sort_by(|a, b| {
         let order = match column.as_str() {
-            "name" => a.name.cmp(&b.name),
+            "name" => natord::compare(&a.name, &b.name),
             "reads" => a.reads.cmp(&b.reads),
             "bases" => a.bases.cmp(&b.bases),
             "nx" => a.nx.cmp(&b.nx),
@@ -249,7 +249,7 @@ fn save_html(f_uploaded: Signal<Vec<UploadedFile>>, numbers_type: String, name_t
             // Embed the Qscore histogram as raw HTML
             html_data.push_str(&format!(
                 "<td class='histogram-cell'>{}</td>\n",
-                if plot_type == "bases" {
+                if plot_type != "reads" {
                     generate_qbases_histogram(&file.q_hash, plot_type.clone())
                 } else {
                     generate_q_histogram(&file.q_vector)
@@ -339,7 +339,7 @@ fn generate_q_histogram(q_vector: &[u8]) -> String {
         .join("") // Combine all bars into a single string
 }
 
-fn generate_qbases_histogram(q_hash: &std::collections::BTreeMap<u8, i64>, ptype: String) -> String {
+fn generate_qbases_histogram(q_hash: &std::collections::BTreeMap<u8, i64>, plot_type: String) -> String {
     let mut bins = [0i64; 30]; // 30 bins for Q 0-60 (2 per bin)
     let max_bin_index = bins.len() - 1;
 
@@ -368,7 +368,7 @@ fn generate_qbases_histogram(q_hash: &std::collections::BTreeMap<u8, i64>, ptype
             //         "0.0".to_string()
             //     };
 
-            match ptype.as_str() {
+            match plot_type.as_str() {
             "cumulative" => {
                 let height = (temp_total - bases) as f64 / total_bases as f64 * 100.0;
                 let percent = if total_bases > 0 {
@@ -658,7 +658,7 @@ fn app() -> Element {
             {include_str!("../assets/custom.css")} 
         }
         
-        components::app_title {}
+        {components::app_title(files_count)}
         
         div {
             label { r#for: "textreader", "" }

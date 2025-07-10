@@ -12,6 +12,8 @@ body {
     flex-direction: column;
     align-items: center;
     min-height: 100vh;
+    height: 100%;
+    overflow: hidden;
 }
 
 p {
@@ -113,7 +115,7 @@ tr.total-row {
   background-color: #d1d1d2;
 }
 tr.total-row:hover {
-  background-color: #1b5e8c;
+  background-color: #a4a4a5;
 }
 
 tr.total-row td {
@@ -214,7 +216,7 @@ td, th {
     vertical-align: bottom; /* Align content to the bottom of the cell */
 }
 .table-scroll {
-    max-height: 80vh;      /* Adjust as needed */
+    max-height: 70vh;      /* Adjust as needed */
     overflow-y: auto;
     margin-bottom: 1em;
     border-radius: 4px;
