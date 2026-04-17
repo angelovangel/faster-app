@@ -1,3 +1,4 @@
+#[cfg(not(target_arch = "wasm32"))]
 use rayon::prelude::*;
 
 // get NX
@@ -5,7 +6,10 @@ pub fn get_nx(numbers: &mut [i64], fraction: f32) -> i64 {
     numbers.sort_unstable();
 
     // half of the bases
-    let halfsum = numbers.par_iter().sum::<i64>() as f32 * fraction; // f32 * f32
+    #[cfg(not(target_arch = "wasm32"))]
+    let halfsum = numbers.par_iter().sum::<i64>() as f32 * fraction; 
+    #[cfg(target_arch = "wasm32")]
+    let halfsum = numbers.iter().sum::<i64>() as f32 * fraction;
 
     // cumsum of the sorted vector
     let cumsum = numbers
@@ -15,7 +19,11 @@ pub fn get_nx(numbers: &mut [i64], fraction: f32) -> i64 {
             Some(*sum)
         })
         .collect::<Vec<_>>();
+
+    #[cfg(not(target_arch = "wasm32"))]
     let n50_index = cumsum.par_iter().position_first(|&x| x > halfsum as i64).unwrap();
+    #[cfg(target_arch = "wasm32")]
+    let n50_index = cumsum.iter().position(|&x| x > halfsum as i64).unwrap();
 
     numbers[n50_index]
 }

@@ -1,40 +1,83 @@
 use std::io::{Write, Cursor};
+#[cfg(not(target_arch = "wasm32"))]
 use std::fs::File;
 use std::path::Path;
 use std::sync::Arc;
 //use std::io::Cursor;
 use std::time::{Instant, Duration};
 use std::collections::BTreeMap;
+#[cfg(not(target_arch = "wasm32"))]
 use arboard::Clipboard;
+#[cfg(not(target_arch = "wasm32"))]
 use rfd::FileDialog;
 
 use bio::io::fastq;
 use flate2::read::MultiGzDecoder;
 
+#[cfg(not(target_arch = "wasm32"))]
 use dioxus::desktop::{Config, LogicalSize, WindowBuilder};
 //use dioxus::prelude::dioxus_elements::FileEngine;
 use dioxus::prelude::*;
 
 use human_repr::HumanCount as HC;
 use indicatif::{HumanCount, HumanDuration};
+#[cfg(not(target_arch = "wasm32"))]
 use tokio::task;
+
+#[cfg(target_arch = "wasm32")]
+use wasm_bindgen_futures::spawn_local;
 
 mod modules;
 mod components;
 
-fn main() {
-    let config = Config::new()
-    .with_window(
-        WindowBuilder::new()
-            .with_focused(true)
-            .with_title("fasterx")
-            .with_inner_size(LogicalSize::new(1400, 700)),
-    );
-    //.with_custom_head(custom_head.to_string());
+async fn my_yield() {
+    #[cfg(not(target_arch = "wasm32"))]
+    tokio::task::yield_now().await;
+    #[cfg(target_arch = "wasm32")]
+    {
+        // On web, we can wait for a microtask or a frame
+        let promise = js_sys::Promise::resolve(&wasm_bindgen::JsValue::UNDEFINED);
+        let _ = wasm_bindgen_futures::JsFuture::from(promise).await;
+    }
+}
 
-    LaunchBuilder::desktop()
-        .with_cfg(config)
-        .launch(app)
+async fn my_sleep(ms: u64) {
+    #[cfg(not(target_arch = "wasm32"))]
+    tokio::time::sleep(std::time::Duration::from_millis(ms)).await;
+    #[cfg(target_arch = "wasm32")]
+    {
+        let promise = js_sys::Promise::new(&mut |resolve, _| {
+            let window = web_sys::window().unwrap();
+            let _ = window.set_timeout_with_callback_and_timeout_and_arguments_0(&resolve, ms as i32);
+        });
+        let _ = wasm_bindgen_futures::JsFuture::from(promise).await;
+    }
+}
+
+fn main() {
+    // Init logger
+    dioxus_logger::init(log::LevelFilter::Info).expect("failed to init logger");
+    
+    #[cfg(target_arch = "wasm32")]
+    {
+        // Standard panic hook for web
+        console_error_panic_hook::set_once();
+        LaunchBuilder::web().launch(app);
+    }
+
+    #[cfg(not(target_arch = "wasm32"))]
+    {
+        let config = Config::new()
+        .with_window(
+            WindowBuilder::new()
+                .with_focused(true)
+                .with_title("fasterx")
+                .with_inner_size(LogicalSize::new(1400, 700)),
+        );
+        LaunchBuilder::desktop()
+            .with_cfg(config)
+            .launch(app)
+    }
 }
 #[derive(Clone)]
 struct UploadedFile {
@@ -180,9 +223,21 @@ fn copy_to_clipboard(f_uploaded: Signal<Vec<UploadedFile>>) {
         ));
     }
 
-    // Use the `arboard` crate to copy the data to the clipboard
-    let mut clipboard = Clipboard::new().unwrap();
-    clipboard.set_text(csv_data).unwrap();
+    #[cfg(not(target_arch = "wasm32"))]
+    {
+        // Use the `arboard` crate to copy the data to the clipboard
+        if let Ok(mut clipboard) = Clipboard::new() {
+            let _ = clipboard.set_text(csv_data);
+        }
+    }
+
+    #[cfg(target_arch = "wasm32")]
+    {
+        let window = web_sys::window().expect("window not found");
+        let navigator = window.navigator();
+        let clipboard = navigator.clipboard();
+        let _ = clipboard.write_text(&csv_data);
+    }
 }
 
 fn save_html(f_uploaded: Signal<Vec<UploadedFile>>, numbers_type: String, name_type: String, binsize: usize, plot_type: String) {
@@ -265,28 +320,60 @@ fn save_html(f_uploaded: Signal<Vec<UploadedFile>>, numbers_type: String, name_t
         html_data
     };
 
-    // Use `spawn_blocking` to avoid blocking the main thread
-    task::spawn_blocking(move || {
-        let path = std::env::current_dir().unwrap();
+    // Use conditional logic based on target
+    #[cfg(not(target_arch = "wasm32"))]
+    {
+        // Use `spawn_blocking` to avoid blocking the main thread
+        task::spawn_blocking(move || {
+            let path = std::env::current_dir().unwrap_or_default();
 
-        if let Some(mypath) = FileDialog::new()
-            .set_title("Save HTML File")
-            .set_directory(&path)
-            .set_file_name("fasterx_results.html")
-            .save_file()
-        {
-            // Save the HTML to the selected file
-            if let Ok(mut file) = File::create(mypath) {
-                if let Err(e) = file.write_all(html_data.as_bytes()) {
-                    eprintln!("Failed to write HTML file: {}", e);
+            if let Some(mypath) = FileDialog::new()
+                .set_title("Save HTML File")
+                .set_directory(&path)
+                .set_file_name("fasterx_results.html")
+                .save_file()
+            {
+                // Save the HTML to the selected file
+                if let Ok(mut file) = File::create(mypath) {
+                    if let Err(e) = file.write_all(html_data.as_bytes()) {
+                        eprintln!("Failed to write HTML file: {}", e);
+                    }
+                } else {
+                    eprintln!("Failed to create HTML file");
                 }
             } else {
-                eprintln!("Failed to create HTML file");
+                eprintln!("Save operation canceled");
             }
-        } else {
-            eprintln!("Save operation canceled");
-        }
-    });
+        });
+    }
+
+    #[cfg(target_arch = "wasm32")]
+    {
+        use wasm_bindgen::JsCast;
+        let window = web_sys::window().expect("window not found");
+        let document = window.document().expect("document not found");
+        
+        // Create blob
+        let parts = js_sys::Array::new();
+        parts.push(&wasm_bindgen::JsValue::from_str(&html_data));
+        let mut blob_props = web_sys::BlobPropertyBag::new();
+        blob_props.type_("text/html");
+        let blob = web_sys::Blob::new_with_str_sequence_and_options(&parts, &blob_props).expect("failed to create blob");
+        
+        // Create URL
+        let url = web_sys::Url::create_object_url_with_blob(&blob).expect("failed to create URL");
+        
+        // Create anchor and click it
+        let a = document.create_element("a").expect("failed to create anchor").dyn_into::<web_sys::HtmlAnchorElement>().expect("failed to cast anchor");
+        a.set_href(&url);
+        a.set_download("fasterx_results.html");
+        document.body().expect("body not found").append_child(&a).expect("failed to append anchor");
+        a.click();
+        
+        // Cleanup
+        document.body().unwrap().remove_child(&a).expect("failed to remove anchor");
+        web_sys::Url::revoke_object_url(&url).expect("failed to revoke URL");
+    }
 }
 
 fn format_thead(sortby: Signal<(String, bool)>, sortcol: &str) -> String {
@@ -352,7 +439,7 @@ fn generate_qbases_histogram(q_hash: &std::collections::BTreeMap<u8, i64>, plot_
         } else {
             bins[max_bin_index] += count;
         }
-}
+    }
 
     let max_bases = *bins.iter().max().unwrap_or(&1);
     let total_bases: i64 = bins.iter().sum();
@@ -556,6 +643,7 @@ fn app() -> Element {
     let mut busy = use_signal(|| false);
     let mut ready = use_signal(|| false);
     let mut cancel_processing = use_signal(|| false);
+    #[cfg(not(target_arch = "wasm32"))]
     let mut start_time = use_signal(|| Instant::now());
     let mut myduration = use_signal(|| String::new());
     let mut progress_percentage = use_signal(|| 0.0);
@@ -599,7 +687,7 @@ fn app() -> Element {
                         *qhash.entry(q).or_insert(0) += 1; // Count occurrences of each quality score
                     }
 
-                    tokio::task::yield_now().await; // Yield to allow the UI to update
+                    my_yield().await; // Yield to allow the UI to update
                 }
                 let n50 = modules::get_nx(&mut len_vector, 0.5);
                 let median_qscore = modules::median(&mut qual_vector);
@@ -621,8 +709,8 @@ fn app() -> Element {
                 let prev_count = *files_count_post.read();
                 files_count_post.set(prev_count + 1); // increment after each file processed
                 progress_percentage.set((*files_count_post.read() as f64 / *files_count_pre.read() as f64) * 100.0);
-                tokio::task::yield_now().await;
-                tokio::time::sleep(std::time::Duration::from_millis(500)).await;
+                my_yield().await;
+                my_sleep(500).await;
                 total_bases += nbases;
                 total_reads += nreads;
             }
@@ -640,17 +728,22 @@ fn app() -> Element {
             busy.set(true);
             files_count_pre.set(file_engine.files().len());
             files_count_post.set(0);
+            #[cfg(not(target_arch = "wasm32"))]
             start_time.set(Instant::now()); // Record the start time
             
             spawn(async move { 
                 read_files(file_engine).await; // Process all files
+                
+                #[cfg(not(target_arch = "wasm32"))]
                 myduration.set(HumanDuration(Instant::now() - start_time()).to_string()); 
+                #[cfg(target_arch = "wasm32")]
+                myduration.set("N/A".to_string());
 
                 // Show the "ready" popup once
                 ready.set(true);
                 busy.set(false); 
                 progress_percentage.set(0.0);
-                tokio::time::sleep(std::time::Duration::from_secs(3)).await; // Wait for 3 seconds
+                my_sleep(3000).await; // Wait for 3 seconds
                 ready.set(false); // Hide the popup
                 //files_count.set(0);
             });
@@ -658,6 +751,8 @@ fn app() -> Element {
     };
     
     rsx! {
+        document::Stylesheet { href: "https://fonts.googleapis.com/css?family=Roboto:300,400,500" }
+        document::Stylesheet { href: "https://fonts.googleapis.com/css?family=Material+Icons&display=block" }
         style { 
             {include_str!("../assets/custom.css")} 
         }
@@ -701,7 +796,7 @@ fn app() -> Element {
 
                         // Use an async task to handle the delay, dioxus::prelude::spawn()
                         spawn(async move {
-                            tokio::time::sleep(Duration::from_secs(3)).await;
+                            my_sleep(3000).await;
                             show_popup.set(false);
                         });
                     },
@@ -927,7 +1022,13 @@ fn app() -> Element {
             href: "#",
             style: "text-decoration: none; color: inherit; cursor: pointer;",
             onclick: move |_| {
+                #[cfg(not(target_arch = "wasm32"))]
                 let _ = open::that("https://github.com/angelovangel/faster-app");
+                #[cfg(target_arch = "wasm32")]
+                {
+                    let window = web_sys::window().expect("window not found");
+                    let _ = window.open_with_url_and_target("https://github.com/angelovangel/faster-app", "_blank");
+                }
             },
             dangerous_inner_html: r#"<svg height="18" width="18" viewBox="0 0 16 16" fill="currentColor" style="vertical-align:middle; margin-right:4px;"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.01.08-2.12 0 0 .67-.21 2.2.82a7.65 7.65 0 0 1 2-.27c.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.11.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.19 0 .21.15.46.55.38A8.013 8.013 0 0 0 16 8c0-4.42-3.58-8-8-8z"/></svg>"#,
             //"GitHub"

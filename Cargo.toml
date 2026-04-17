@@ -7,31 +7,42 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-
-dioxus = { version = "0.6.1", features = ["desktop"] }
-
+dioxus = { version = "0.6.1" }
 bio = "1.6.0"
 getrandom = { version = "0.2", features = ["js"] }
 indicatif = "0.17.8"
 human-repr = "1"
 flate2 = "1.0"
-rayon = "1.5"
-tokio = { version = "1", features = ["full"] }
 csv = "1.3.1"
-arboard = "2.0"
-rfd = "0.12"
 chrono = "0.4"
-open = "5"
 natord = "1"
-
 # Debug
 log = "0.4.19"
 dioxus-logger = "0.4.1"
+
+# Platform-specific dependencies
+[target.'cfg(not(target_arch = "wasm32"))'.dependencies]
+arboard = "2.0"
+rfd = "0.12"
+open = "5"
+rayon = "1.5"
+tokio = { version = "1", features = ["full"] }
+
+[target.'cfg(target_arch = "wasm32")'.dependencies]
+wasm-bindgen = "0.2"
+web-sys = { version = "0.3", features = ["Window", "Navigator", "Clipboard", "Document", "Element", "HtmlAnchorElement", "Blob", "BlobPropertyBag", "Url"] }
+js-sys = "0.3"
+wasm-bindgen-futures = "0.4"
 console_error_panic_hook = "0.1.7"
 
 
+[features]
+default = ["desktop"]
+desktop = ["dioxus/desktop"]
+web = ["dioxus/web"]
+
 # added according to dioxus docs to minimize size
-[release]
+[profile.release]
 opt-level = "z"
 debug = false
 lto = true
@@ -39,8 +50,6 @@ codegen-units = 1
 panic = "abort"
 strip = true
 incremental = false
-
-[profile]
 
 [profile.wasm-dev]
 inherits = "dev"
