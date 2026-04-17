@@ -2,7 +2,4 @@
 
 Testing `dioxus`   
 
-Before mount:
-```
-xattr -d com.apple.quarantine fasterx_0.2.3_aarch64.dmg 
-```
+https://angelovangel.github.io/faster-app/
