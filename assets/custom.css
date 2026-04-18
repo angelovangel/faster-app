@@ -308,8 +308,10 @@ td.histogram-cell, th.histogram-cell {
 
 .app-footer {
     width: 100%;
-    text-align: right;
-    padding: 5px 5px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 5px 20px;
     background-color: #f9f9f9; /* Light background for contrast */
     color: #555; /* Text color */
     font-size: 0.8rem; /* Slightly smaller font size */
@@ -317,4 +319,5 @@ td.histogram-cell, th.histogram-cell {
     position: fixed; /* Keep the footer at the bottom of the page */
     bottom: 0;
     left: 0;
+    z-index: 1000;
 }

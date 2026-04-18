@@ -1,10 +1,13 @@
-use std::io::{Write, Cursor};
+#[cfg(not(target_arch = "wasm32"))]
+use std::io::Write;
+use std::io::Cursor;
 #[cfg(not(target_arch = "wasm32"))]
 use std::fs::File;
 use std::path::Path;
 use std::sync::Arc;
 //use std::io::Cursor;
-use std::time::{Instant, Duration};
+#[cfg(not(target_arch = "wasm32"))]
+use std::time::Instant;
 use std::collections::BTreeMap;
 #[cfg(not(target_arch = "wasm32"))]
 use arboard::Clipboard;
@@ -18,14 +21,18 @@ use flate2::read::MultiGzDecoder;
 use dioxus::desktop::{Config, LogicalSize, WindowBuilder};
 //use dioxus::prelude::dioxus_elements::FileEngine;
 use dioxus::prelude::*;
+#[cfg(target_arch = "wasm32")]
+use dioxus::prelude::document::eval;
 
 use human_repr::HumanCount as HC;
-use indicatif::{HumanCount, HumanDuration};
+use indicatif::HumanCount;
+#[cfg(not(target_arch = "wasm32"))]
+use indicatif::HumanDuration;
 #[cfg(not(target_arch = "wasm32"))]
 use tokio::task;
 
 #[cfg(target_arch = "wasm32")]
-use wasm_bindgen_futures::spawn_local;
+use wasm_bindgen_futures as _; // Or just remove the line if not needed
 
 mod modules;
 mod components;
@@ -356,8 +363,8 @@ fn save_html(f_uploaded: Signal<Vec<UploadedFile>>, numbers_type: String, name_t
         // Create blob
         let parts = js_sys::Array::new();
         parts.push(&wasm_bindgen::JsValue::from_str(&html_data));
-        let mut blob_props = web_sys::BlobPropertyBag::new();
-        blob_props.type_("text/html");
+        let blob_props = web_sys::BlobPropertyBag::new();
+        blob_props.set_type("text/html");
         let blob = web_sys::Blob::new_with_str_sequence_and_options(&parts, &blob_props).expect("failed to create blob");
         
         // Create URL
@@ -646,6 +653,10 @@ fn app() -> Element {
     #[cfg(not(target_arch = "wasm32"))]
     let mut start_time = use_signal(|| Instant::now());
     let mut myduration = use_signal(|| String::new());
+    #[cfg(target_arch = "wasm32")]
+    let mut memory_usage = use_signal(|| String::new());
+    #[cfg(not(target_arch = "wasm32"))]
+    let memory_usage = use_signal(|| String::new());
     let mut progress_percentage = use_signal(|| 0.0);
     let mut show_popup = use_signal(|| false);
     let mut sort_by = use_signal(|| ("name".to_string(), true)); // Default sort by name ascending
@@ -709,6 +720,20 @@ fn app() -> Element {
                 let prev_count = *files_count_post.read();
                 files_count_post.set(prev_count + 1); // increment after each file processed
                 progress_percentage.set((*files_count_post.read() as f64 / *files_count_pre.read() as f64) * 100.0);
+                
+                // Update memory usage for Web
+                # [cfg(target_arch = "wasm32")]
+                {
+                    let mut mem_eval = eval(r#"
+                        var mem = performance.memory ? (performance.memory.usedJSHeapSize / 1024 / 1024).toFixed(1) + ' MB' : 'N/A';
+                        dioxus.send(mem);
+                    "#);
+                    if let Ok(mem) = mem_eval.recv::<serde_json::Value>().await {
+                        let mem_str = mem.as_str().unwrap_or("N/A");
+                        memory_usage.set(mem_str.to_string());
+                    }
+                }
+                
                 my_yield().await;
                 my_sleep(500).await;
                 total_bases += nbases;
@@ -731,13 +756,21 @@ fn app() -> Element {
             #[cfg(not(target_arch = "wasm32"))]
             start_time.set(Instant::now()); // Record the start time
             
+            #[cfg(target_arch = "wasm32")]
+            let start_time_web = web_sys::window().unwrap().performance().unwrap().now();
+            
             spawn(async move { 
                 read_files(file_engine).await; // Process all files
                 
                 #[cfg(not(target_arch = "wasm32"))]
                 myduration.set(HumanDuration(Instant::now() - start_time()).to_string()); 
+                
                 #[cfg(target_arch = "wasm32")]
-                myduration.set("N/A".to_string());
+                {
+                    let end_time_web = web_sys::window().unwrap().performance().unwrap().now();
+                    let elapsed = (end_time_web - start_time_web) / 1000.0;
+                    myduration.set(format!("{:.2}s", elapsed));
+                }
 
                 // Show the "ready" popup once
                 ready.set(true);
@@ -758,6 +791,7 @@ fn app() -> Element {
         }
         
         {components::app_title(files_count_post)}
+        
         
         div {
             label { r#for: "textreader", "" }
@@ -1014,26 +1048,38 @@ fn app() -> Element {
             }
         }
 
-        // Footer with app version info
+        // Footer with app version info and metrics
         footer {
             class: "app-footer",
-            {format!("fasterX v{} © 2025 | ", env!("CARGO_PKG_VERSION"))}
-            a {
-            href: "#",
-            style: "text-decoration: none; color: inherit; cursor: pointer;",
-            onclick: move |_| {
-                #[cfg(not(target_arch = "wasm32"))]
-                let _ = open::that("https://github.com/angelovangel/faster-app");
-                #[cfg(target_arch = "wasm32")]
-                {
-                    let window = web_sys::window().expect("window not found");
-                    let _ = window.open_with_url_and_target("https://github.com/angelovangel/faster-app", "_blank");
+            div {
+                class: "footer-left",
+                {format!("fasterX v{} © 2025 | ", env!("CARGO_PKG_VERSION"))}
+                a {
+                    href: "#",
+                    style: "text-decoration: none; color: inherit; cursor: pointer;",
+                    onclick: move |_| {
+                        #[cfg(not(target_arch = "wasm32"))]
+                        let _ = open::that("https://github.com/angelovangel/faster-app");
+                        #[cfg(target_arch = "wasm32")]
+                        {
+                            let window = web_sys::window().expect("window not found");
+                            let _ = window.open_with_url_and_target("https://github.com/angelovangel/faster-app", "_blank");
+                        }
+                    },
+                    dangerous_inner_html: r#"<svg height="18" width="18" viewBox="0 0 16 16" fill="currentColor" style="vertical-align:middle; margin-right:4px;"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.01.08-2.12 0 0 .67-.21 2.2.82a7.65 7.65 0 0 1 2-.27c.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.11.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.19 0 .21.15.46.55.38A8.013 8.013 0 0 0 16 8c0-4.42-3.58-8-8-8z"/></svg>"#,
                 }
-            },
-            dangerous_inner_html: r#"<svg height="18" width="18" viewBox="0 0 16 16" fill="currentColor" style="vertical-align:middle; margin-right:4px;"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.01.08-2.12 0 0 .67-.21 2.2.82a7.65 7.65 0 0 1 2-.27c.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.11.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.19 0 .21.15.46.55.38A8.013 8.013 0 0 0 16 8c0-4.42-3.58-8-8-8z"/></svg>"#,
-            //"GitHub"
             }
-}
+            if busy() || !myduration().is_empty() {
+                div {
+                    class: "footer-right",
+                    style: "display: flex; gap: 15px; font-size: 0.9em; opacity: 0.9;",
+                    span { "Time: {myduration}" }
+                    if !memory_usage().is_empty() {
+                        span { " | Mem: {memory_usage}" }
+                    }
+                }
+            }
+        }
 
         if *busy.read() {
             button {
