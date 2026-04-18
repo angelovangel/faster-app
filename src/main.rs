@@ -792,23 +792,38 @@ fn app() -> Element {
         
         {components::app_title(files_count_post)}
         
-        
         div {
-            label { r#for: "textreader", "" }
+            class: "controls-row",
+            // Always show the upload button
+            label {
+                r#for: "textreader",
+                class: "file-upload-label",
+                svg {
+                    class: "upload-icon",
+                    fill: "none",
+                    stroke: "currentColor",
+                    view_box: "0 0 24 24",
+                    xmlns: "http://www.w3.org/2000/svg",
+                    path {
+                        stroke_linecap: "round",
+                        stroke_linejoin: "round",
+                        stroke_width: "2",
+                        d: "M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"
+                    }
+                }
+                span { class: "upload-text", "Add Sequences" } 
+            }
             input {
-                class: "usercontrols",
+                id: "textreader",
+                class: "file-input-hidden",
                 r#type: "file",
                 accept: ".fastq,.gz",
                 multiple: true,
-                name: "textreader",
-                //directory: enable_directory_upload,
-                directory: false,
                 onchange: upload_files
             }
 
-            label {""}
-
-            if files_uploaded.len() > 0{
+            // Only show other controls if files are uploaded
+            if files_uploaded.len() > 0 {
                 button {
                     class: "usercontrols",
                     onclick: move |_| {
@@ -827,8 +842,6 @@ fn app() -> Element {
                     onclick: move |_| {
                         copy_to_clipboard(files_uploaded.clone());
                         show_popup.set(true);
-
-                        // Use an async task to handle the delay, dioxus::prelude::spawn()
                         spawn(async move {
                             my_sleep(3000).await;
                             show_popup.set(false);
@@ -836,7 +849,6 @@ fn app() -> Element {
                     },
                     "Copy to clipboard"
                 }
-
                 button {
                     class: "usercontrols",
                     onclick: move |_| {
@@ -844,7 +856,6 @@ fn app() -> Element {
                     },
                     "Save as HTML"
                 }
-                
                 select {
                     r#name: "name_type_sig",
                     class: "usercontrols",
@@ -855,8 +866,6 @@ fn app() -> Element {
                     option {value: "basename", "Base filename"}
                     option {value: "fullpath", "Full path"},
                 }
-
-                //label {r#for: "numbers", ""}
                 div {
                     class: "tooltip-container",
                     div {
@@ -875,7 +884,6 @@ fn app() -> Element {
                         option {value: "human", "SI suffix"}
                     }
                 }
-
                 select {  
                     r#name: "spark_type", id: "spark_type",
                     class: "usercontrols",
@@ -887,7 +895,6 @@ fn app() -> Element {
                     option {value: "bases", "Plot bases"},
                     option {value: "cumulative", "Plot base yield"}
                 }
-                
                 div {
                     class: "tooltip-container",
                     div {
@@ -899,156 +906,116 @@ fn app() -> Element {
                     input {
                         r#type: "number",
                         id: "basesperbin",
-                        //title: "Bases per bin for the length histogram",
                         class: "usercontrols",
-                        value: "{basesperbin}", // Bind the current value of basesperbin
+                        value: "{basesperbin}",
                         min: "50",
                         max: "5000",
-                        step: "50", // Set the step size for increment/decrement
+                        step: "50",
                         oninput: move |ev| {
                             if let Ok(value) = ev.value().parse::<usize>() {
                                 if value > 0 {
-                                    basesperbin.set(value); // Update the basesperbin signal
+                                    basesperbin.set(value);
                                 }
                             }
                         }
                     }
                 }
-        }
-
+            }
         }
 
         if files_uploaded.len() > 0 {
-           div {
-            class: "table-scroll" ,
-            table {
-                id: "resultstable",
-                thead {
-                    tr {
-                        th {
-                            class: "sortable-header",
-                            onclick: {
-                                let current_sort = sort_by.read().1;
-                                move |_| sort_by.set(("name".to_string(), !current_sort))
-                            },
-                            "File ",
-                            {format_thead(sort_by, "name")}
-                            // if sort_by.read().0 == "name" {
-                            //     if sort_by.read().1 {
-                            //         "↑" // Ascending
-                            //     } else {
-                            //         "↓" // Descending
-                            //     }
-                            // } else {
-                            //     "↕" // Default indicator for unsorted columns
-                            // }
-                        }
-                        th {
-                            class: "sortable-header",
-                            onclick: {
-                                let current_sort = sort_by.read().1;
-                                move |_| sort_by.set(("reads".to_string(), !current_sort))
-                            },
-                            "Reads ",
-                            {format_thead(sort_by, "reads")}
-                        }
-                        th {
-                            class: "sortable-header",
-                            onclick: {
-                                let current_sort = sort_by.read().1;
-                                move |_| sort_by.set(("bases".to_string(), !current_sort))
-                            },
-                            "Bases ",
-                            {format_thead(sort_by, "bases")}
-                        }
-                        th {
-                            class: "sortable-header",
-                            onclick: {
-                                let current_sort = sort_by.read().1;
-                                move |_| sort_by.set(("nx".to_string(), !current_sort))
-                            },
-                            "N50 ",
-                            {format_thead(sort_by, "nx")}
-                        }
-                        if spark_type() == "bases" {
+            div {
+                class: "table-scroll",
+                table {
+                    id: "resultstable",
+                    thead {
+                        tr {
                             th {
-                                class: "histogram-header",
-                                "Bases length histogram",
+                                class: "sortable-header",
+                                onclick: {
+                                    let current_sort = sort_by.read().1;
+                                    move |_| sort_by.set(("name".to_string(), !current_sort))
+                                },
+                                "File ",
+                                {format_thead(sort_by, "name")}
                             }
-                        } else if spark_type() == "cumulative" {
                             th {
-                                class: "histogram-header",
-                                "Base yield over length",
+                                class: "sortable-header",
+                                onclick: {
+                                    let current_sort = sort_by.read().1;
+                                    move |_| sort_by.set(("reads".to_string(), !current_sort))
+                                },
+                                "Reads ",
+                                {format_thead(sort_by, "reads")}
                             }
-
-                        } else {
                             th {
-                                class: "histogram-header",
-                                "Reads length histogram",
+                                class: "sortable-header",
+                                onclick: {
+                                    let current_sort = sort_by.read().1;
+                                    move |_| sort_by.set(("bases".to_string(), !current_sort))
+                                },
+                                "Bases ",
+                                {format_thead(sort_by, "bases")}
                             }
-                        }
-                        th {
-                            class: "sortable-header",
-                            onclick: {
-                                let current_sort = sort_by.read().1;
-                                move |_| sort_by.set(("gc".to_string(), !current_sort))
-                            },
-                            "GC% ",
-                            {format_thead(sort_by, "gc")}
-                        }
-                        // th {
-                        //     class: "sortable-header",
-                        //     onclick: {
-                        //         let current_sort = sort_by.read().1;
-                        //         move |_| sort_by.set(("q20".to_string(), !current_sort))
-                        //     },
-                        //     "Q20% ",
-                        //     {format_thead(sort_by, "q20")}
-                        // }
-                        th {
-                            class: "sortable-header",
-                            onclick: {
-                                let current_sort = sort_by.read().1;
-                                move |_| sort_by.set(("q30".to_string(), !current_sort))
-                            },
-                            "Q30% ",
-                            {format_thead(sort_by, "q30")}
-                        }
-                        th {
-                            class: "sortable-header",
-                            onclick: {
-                                let current_sort = sort_by.read().1;
-                                move |_| sort_by.set(("m_qscore".to_string(), !current_sort))
-                            },
-                            "Reads median Q",
-                            {format_thead(sort_by, "m_qscore")}
-                        }
-                        if spark_type() == "bases" {
                             th {
-                                class: "histogram-header",
-                                "Bases Qscore histogram"
+                                class: "sortable-header",
+                                onclick: {
+                                    let current_sort = sort_by.read().1;
+                                    move |_| sort_by.set(("nx".to_string(), !current_sort))
+                                },
+                                "N50 ",
+                                {format_thead(sort_by, "nx")}
                             }
-                        } else if spark_type() == "cumulative" {
-                            th {
-                                class: "histogram-header",
-                                "Base yield over Qscore" 
+                            if spark_type() == "bases" {
+                                th { class: "histogram-header", "Bases length histogram" }
+                            } else if spark_type() == "cumulative" {
+                                th { class: "histogram-header", "Base yield over length" }
+                            } else {
+                                th { class: "histogram-header", "Reads length histogram" }
                             }
-                        } else {
                             th {
-                                class: "histogram-header",
-                                "Reads Qscore histogram"
+                                class: "sortable-header",
+                                onclick: {
+                                    let current_sort = sort_by.read().1;
+                                    move |_| sort_by.set(("gc".to_string(), !current_sort))
+                                },
+                                "GC% ",
+                                {format_thead(sort_by, "gc")}
+                            }
+                            th {
+                                class: "sortable-header",
+                                onclick: {
+                                    let current_sort = sort_by.read().1;
+                                    move |_| sort_by.set(("q30".to_string(), !current_sort))
+                                },
+                                "Q30% ",
+                                {format_thead(sort_by, "q30")}
+                            }
+                            th {
+                                class: "sortable-header",
+                                onclick: {
+                                    let current_sort = sort_by.read().1;
+                                    move |_| sort_by.set(("m_qscore".to_string(), !current_sort))
+                                },
+                                "Reads median Q",
+                                {format_thead(sort_by, "m_qscore")}
+                            }
+                            if spark_type() == "bases" {
+                                th { class: "histogram-header", "Bases Qscore histogram" }
+                            } else if spark_type() == "cumulative" {
+                                th { class: "histogram-header", "Base yield over Qscore" }
+                            } else {
+                                th { class: "histogram-header", "Reads Qscore histogram" }
                             }
                         }
                     }
+                    tbody {
+                        {maketable(files_uploaded, name_type_sig(), numbers(), basesperbin, spark_type, total_reads, total_bases, sort_by)}
+                    }
                 }
-                tbody {
-                    {maketable(files_uploaded, name_type_sig(), numbers(), basesperbin, spark_type, total_reads, total_bases, sort_by)}
-                }
-            }
             }
         }
 
-        // Footer with app version info and metrics
         footer {
             class: "app-footer",
             div {
@@ -1086,7 +1053,6 @@ fn app() -> Element {
                 class: "usercontrols usercontrols-cancel",
                 onclick: move |_| {
                     cancel_processing.set(true);
-
                 },
                 "Cancel processing ✕"
             }

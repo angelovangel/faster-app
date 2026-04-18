@@ -134,17 +134,86 @@ tbody tr:hover {
 .usercontrols {
     cursor: pointer;
     margin: 0.1em 0.2em;
-    display: inline-block;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
     font-weight: 500;
     line-height: 1.5;
     text-align: center;
     background-color: #2E86C1;
     color: #fff;
     border: none;
-    padding: 8px 16px;
-    font-size: 0.9rem;
-    border-radius: 4px;
-    transition: background-color 0.3s ease, transform 0.2s ease;
+    padding: 10px 20px;
+    font-size: 0.95rem;
+    border-radius: 8px;
+    transition: all 0.2s ease;
+    box-shadow: 0 4px 6px rgba(46, 134, 193, 0.2);
+    font-family: 'Inter', sans-serif;
+}
+
+.usercontrols:hover {
+    background-color: #21618C;
+    transform: translateY(-2px);
+    box-shadow: 0 6px 12px rgba(46, 134, 193, 0.3);
+}
+
+.usercontrols:active {
+    transform: translateY(0);
+    box-shadow: 0 2px 4px rgba(46, 134, 193, 0.2);
+}
+
+.controls-row {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
+    margin: 15px 0;
+    width: 100%;
+    padding: 0 20px;
+}
+
+.file-input-hidden {
+    display: none !important;
+}
+
+.file-upload-label {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    padding: 10px 20px;
+    background-color: #2E86C1;
+    color: #fff;
+    border-radius: 8px;
+    cursor: pointer;
+    font-weight: 500;
+    font-family: 'Inter', sans-serif;
+    transition: all 0.2s ease;
+    box-shadow: 0 4px 6px rgba(46, 134, 193, 0.2);
+    margin: 0.1em 0.2em;
+    font-size: 0.95rem;
+}
+
+.file-upload-label:hover {
+    background-color: #21618C;
+    transform: translateY(-2px);
+    box-shadow: 0 6px 12px rgba(46, 134, 193, 0.3);
+}
+
+.upload-icon {
+    width: 20px;
+    height: 20px;
+    color: currentColor;
+}
+
+.upload-text {
+    font-size: 0.95rem;
+}
+
+.upload-hint {
+    display: none; /* Hide hint in compact mode to save space */
 }
 
 .usercontrols-cancel {
