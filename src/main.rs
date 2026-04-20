@@ -42,9 +42,9 @@ async fn my_yield() {
     tokio::task::yield_now().await;
     #[cfg(target_arch = "wasm32")]
     {
-        // On web, we can wait for a microtask or a frame
-        let promise = js_sys::Promise::resolve(&wasm_bindgen::JsValue::UNDEFINED);
-        let _ = wasm_bindgen_futures::JsFuture::from(promise).await;
+        // Use a macrotask (setTimeout) to allow the browser to process its event loop
+        // and avoid "page unresponsive" popups
+        my_sleep(0).await;
     }
 }
 
@@ -150,9 +150,9 @@ fn maketable(
         for f in sorted_entries.iter() {
             tr {
                 if name_type == "fullpath" {
-                    td {"{f.name}"}
+                    td { class: "filename-cell", "{f.name}" }
                 } else {
-                    td {"{f.basename}"}
+                    td { class: "filename-cell", "{f.basename}" }
                 }
                 if numbers_type == "comma" {
                     td {"{HumanCount(f.reads)}"}
@@ -683,6 +683,7 @@ fn app() -> Element {
                 let reader = decode_reader(bytes, file).await.unwrap();
                 let mut recs = fastq::Reader::new(reader).records();
 
+                let mut record_counter = 0;
                 while let Some(Ok(rec)) = recs.next() {
                     if *cancel_processing.read() {
                         break; // Exit the loop if processing is canceled
@@ -698,8 +699,12 @@ fn app() -> Element {
                         *qhash.entry(q).or_insert(0) += 1; // Count occurrences of each quality score
                     }
 
-                    my_yield().await; // Yield to allow the UI to update
+                    record_counter += 1;
+                    if record_counter % 1000 == 0 {
+                        my_yield().await; // Yield every 1k records to keep UI responsive
+                    }
                 }
+                my_yield().await; // Final yield after finishing a file
                 let n50 = modules::get_nx(&mut len_vector, 0.5);
                 let median_qscore = modules::median(&mut qual_vector);
 
@@ -750,6 +755,7 @@ fn app() -> Element {
 
     let upload_files = move |evt: FormEvent| {
         if let Some(file_engine) = evt.files() {
+            cancel_processing.set(false); // Reset cancel status for a new upload
             busy.set(true);
             files_count_pre.set(file_engine.files().len());
             files_count_post.set(0);
@@ -1049,21 +1055,24 @@ fn app() -> Element {
         }
 
         if *busy.read() {
-            button {
-                class: "usercontrols usercontrols-cancel",
-                onclick: move |_| {
-                    cancel_processing.set(true);
-                },
-                "Cancel processing ✕"
-            }
             div {
                 class: "popup",
                 "Please wait... {files_count_post} of {files_count_pre} files processed",
                 div {
                     class: "progress-bar-container",
                     div {
-                        class: "progress-bar",
-                        style: "width: {progress_percentage()}%;",
+                        class: "progress-bar-area",
+                        div {
+                            class: "progress-bar",
+                            style: "width: {progress_percentage()}%;",
+                        }
+                    }
+                    button {
+                        class: "progress-cancel-btn",
+                        onclick: move |_| {
+                            cancel_processing.set(true);
+                        },
+                        "Cancel ✕"
                     }
                 }
             }
