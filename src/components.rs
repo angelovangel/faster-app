@@ -7,7 +7,7 @@ pub fn app_title(filescount: Signal<usize>) -> Element {
             if *filescount.read() == 0 {
                 h3 { "Simple fastx file analysis" }
             } else {
-                h4 { "Simple fastx file analysis" }
+                h5 { "Simple fastx file analysis" }
             }
             
         }

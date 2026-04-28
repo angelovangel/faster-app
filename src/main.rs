@@ -39,7 +39,7 @@ mod components;
 
 async fn my_yield() {
     #[cfg(not(target_arch = "wasm32"))]
-    tokio::task::yield_now().await;
+    my_sleep(1).await;
     #[cfg(target_arch = "wasm32")]
     {
         // Use a macrotask (setTimeout) to allow the browser to process its event loop
@@ -684,6 +684,8 @@ fn app() -> Element {
                 let mut recs = fastq::Reader::new(reader).records();
 
                 let mut record_counter = 0;
+                let start_reads = *total_reads.read();
+                let start_bases = *total_bases.read();
                 while let Some(Ok(rec)) = recs.next() {
                     if *cancel_processing.read() {
                         break; // Exit the loop if processing is canceled
@@ -701,6 +703,8 @@ fn app() -> Element {
 
                     record_counter += 1;
                     if record_counter % 1000 == 0 {
+                        total_reads.set(start_reads + nreads);
+                        total_bases.set(start_bases + nbases);
                         my_yield().await; // Yield every 1k records to keep UI responsive
                     }
                 }
@@ -741,8 +745,8 @@ fn app() -> Element {
                 
                 my_yield().await;
                 my_sleep(500).await;
-                total_bases += nbases;
-                total_reads += nreads;
+                total_bases.set(start_bases + nbases);
+                total_reads.set(start_reads + nreads);
             }
         }
 
@@ -1057,7 +1061,7 @@ fn app() -> Element {
         if *busy.read() {
             div {
                 class: "popup",
-                "Please wait... {files_count_post} of {files_count_pre} files processed",
+                "Please wait... {files_count_post} of {files_count_pre} files processed ({HumanCount(total_reads())} reads)",
                 div {
                     class: "progress-bar-container",
                     div {
