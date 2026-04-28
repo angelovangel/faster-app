@@ -269,7 +269,7 @@ select.usercontrols option {
 
 .popup {
     position: fixed;
-    bottom: 20px;
+    bottom: 60px;
     left: 20px;
     right: 20px;
     background-color: #2E86C1;
